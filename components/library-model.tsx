@@ -5,7 +5,8 @@ import { Canvas, useThree } from '@react-three/fiber'
 import { Environment, OrbitControls, useGLTF } from '@react-three/drei'
 import { Box3, Group, Vector3 } from 'three'
 
-function LibraryModel({ onSelect }: { onSelect: () => void }) {
+// onSelect now receives the seat identifier (string) when a specific seat/mesh is clicked
+function LibraryModel({ onSelect }: { onSelect: (seat: string) => void }) {
   const { scene } = useGLTF('/models/kl_boox_house6.glb')
   const modelRef = useRef<Group>(null)
   const { camera } = useThree()
@@ -27,10 +28,28 @@ function LibraryModel({ onSelect }: { onSelect: () => void }) {
     camera.updateProjectionMatrix()
   }, [camera, cloned])
 
-  return <group ref={modelRef} onClick={(event) => { event.stopPropagation(); onSelect() }} onPointerDown={(event) => event.stopPropagation()}><primitive object={cloned} /></group>
+  // The click event bubbles up from the specific mesh that was clicked.
+  // We inspect event.object.name (or event.object.userData) to determine which seat was clicked
+  // and pass that identifier to the onSelect callback. Using `any` for the event keeps types simple.
+  return (
+    <group
+      ref={modelRef}
+      onClick={(event: any) => {
+        event.stopPropagation()
+        // Try to read a seat identifier from the clicked object.
+        // Many glTF models include meaningful `name` values on meshes; some projects store data in userData.
+        const clicked = event?.object
+        const seatId = clicked?.userData?.seatNo || clicked?.name || ''
+        onSelect(seatId)
+      }}
+      onPointerDown={(event: any) => event.stopPropagation()}
+    >
+      <primitive object={cloned} />
+    </group>
+  )
 }
 
-function ModelScene({ onSelect }: { onSelect: () => void }) {
+function ModelScene({ onSelect }: { onSelect: (seat: string) => void }) {
   return <>
     <color attach="background" args={['#dfe8e3']} />
     <ambientLight intensity={0.8} />
@@ -43,10 +62,10 @@ function ModelScene({ onSelect }: { onSelect: () => void }) {
   </>
 }
 
-export function LibraryModelView({ onSelect }: { onSelect: () => void }) {
+export function LibraryModelView({ onSelect }: { onSelect: (seat: string) => void }) {
   return <div className="relative h-[520px] overflow-hidden rounded-2xl border border-border bg-muted shadow-inner sm:h-[620px]">
-    <div className="pointer-events-none absolute left-5 top-5 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Full library floor · 57 seats</div>
-    <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground">Drag to rotate · Scroll to zoom · Double-click to reset</div>
+    <div className="pointer-events-none absolute left-5 top-5 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Full building</div>
+    <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground">Drag to rotate · Scroll to zoom · Double-click to center</div>
     <Canvas camera={{ position: [12, 9, 14], fov: 50 }} dpr={[1, 1.5]} shadows onCreated={({ camera }) => { camera.far = 10000; camera.updateProjectionMatrix() }}>
       <ModelScene onSelect={onSelect} />
     </Canvas>
