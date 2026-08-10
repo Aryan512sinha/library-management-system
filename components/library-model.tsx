@@ -1,9 +1,10 @@
 'use client'
 
-import { Suspense, useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useLayoutEffect, useMemo, useRef, useEffect } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { Environment, OrbitControls, useGLTF } from '@react-three/drei'
 import { Box3, Group, Vector3 } from 'three'
+import { SEATS } from '@/lib/library-data'
 
 // onSelect now receives the seat identifier (string) when a specific seat/mesh is clicked
 function LibraryModel({ onSelect }: { onSelect: (seat: string) => void }) {
@@ -28,6 +29,25 @@ function LibraryModel({ onSelect }: { onSelect: (seat: string) => void }) {
     camera.updateProjectionMatrix()
   }, [camera, cloned])
 
+  // Populate userData.seatNo for meshes if possible (use mesh names that match the SEATS pattern, otherwise assign sequentially)
+  useEffect(() => {
+    if (!cloned) return
+    let seatIndex = 0
+    cloned.traverse((node: any) => {
+      if (node.isMesh) {
+        if (node.name && /[A-Z]-\d{2}/.test(node.name)) {
+          node.userData.seatNo = node.name
+        } else if (!node.userData?.seatNo) {
+          node.userData = node.userData || {}
+          node.userData.seatNo = SEATS[seatIndex]?.seatNo ?? node.name ?? `seat-${seatIndex}`
+          seatIndex++
+        }
+        // clone material so per-seat color changes don't bleed across instances
+        if (node.material) node.material = node.material.clone()
+      }
+    })
+  }, [cloned])
+
   // The click event bubbles up from the specific mesh that was clicked.
   // We inspect event.object.name (or event.object.userData) to determine which seat was clicked
   // and pass that identifier to the onSelect callback. Using `any` for the event keeps types simple.
@@ -40,6 +60,9 @@ function LibraryModel({ onSelect }: { onSelect: (seat: string) => void }) {
         // Many glTF models include meaningful `name` values on meshes; some projects store data in userData.
         const clicked = event?.object
         const seatId = clicked?.userData?.seatNo || clicked?.name || ''
+        // debug log — remove before final merge if desired
+        // eslint-disable-next-line no-console
+        console.log('clicked seat:', clicked?.name, clicked?.userData?.seatNo)
         onSelect(seatId)
       }}
       onPointerDown={(event: any) => event.stopPropagation()}
