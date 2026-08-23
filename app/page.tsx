@@ -1,44 +1,1405 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { AlertCircle, ArrowRight, Bell, BookOpen, Check, ChevronDown, CircleHelp, Clock3, CreditCard, ExternalLink, FileText, LayoutDashboard, LogOut, Menu, Phone, Plus, Search, Settings, ShieldCheck, Smartphone, UserRound, Users, X } from 'lucide-react'
-import { ADMIN_CONTACT, DEMO_ASSIGNMENTS, SEATS, SHIFTS, getAssignment, getExpiryLabel, getExpiryTone, type Role, type ViewMode } from '@/lib/library-data'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AlertCircle,
+  ArrowRight,
+  Bell,
+  BookOpen,
+  Check,
+  ChevronDown,
+  Clock3,
+  CreditCard,
+  ExternalLink,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Phone,
+  Plus,
+  Search,
+  Settings,
+  ShieldCheck,
+  Users,
+  X,
+} from 'lucide-react'
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth'
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  query,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
+import {
+  ADMIN_CONTACT,
+  SEATS,
+  SHIFTS,
+  getExpiryLabel,
+  getExpiryTone,
+  type Assignment,
+  type Role,
+  type ViewMode,
+} from '@/lib/library-data'
+import { auth, db } from '@/lib/firebase'
 import { LibraryModelView } from '@/components/library-model'
 
-const cn = (...classes: Array<string | false | undefined>) => classes.filter(Boolean).join(' ')
+const cn = (...classes: Array<string | false | undefined>) =>
+  classes.filter(Boolean).join(' ')
 
 function Logo() {
-  return <div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20"><BookOpen className="size-5" /></div><div><p className="font-serif text-lg font-bold leading-none tracking-tight">KL Book House</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Library management</p></div></div>
-}
-
-function Login({ onLogin }: { onLogin: (role: Role) => void }) {
-  const [role, setRole] = useState<Role>('admin')
-  return <main className="min-h-screen bg-[radial-gradient(circle_at_80%_10%,hsl(var(--accent)/.7),transparent_38%),linear-gradient(135deg,hsl(var(--background)),hsl(var(--muted)))] px-6 py-8 lg:px-12">
-    <header className="flex items-center justify-between"><Logo /><div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex"><ShieldCheck className="size-4 text-primary" /> Secure workspace</div></header>
-    <div className="mx-auto grid min-h-[calc(100vh-120px)] max-w-6xl items-center gap-16 py-10 lg:grid-cols-[1.08fr_.92fr]">
-      <section className="max-w-xl"><p className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-card/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[.16em] text-primary"><span className="size-1.5 rounded-full bg-primary" /> Today at the library</p><h1 className="font-serif text-5xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-7xl">A quieter way to run your <span className="text-primary">library.</span></h1><p className="mt-7 max-w-md text-base leading-7 text-muted-foreground">Know every seat, every shift, and every renewal at a glance. Built for the people who keep KL Book House moving.</p><div className="mt-10 flex flex-wrap gap-6 text-sm text-muted-foreground"><span className="flex items-center gap-2"><Users className="size-4 text-primary" /> 57 seats</span><span className="flex items-center gap-2"><Clock3 className="size-4 text-primary" /> 4 daily shifts</span><span className="flex items-center gap-2"><ShieldCheck className="size-4 text-primary" /> Role-based access</span></div></section>
-      <section className="rounded-3xl border border-border/70 bg-card p-8 shadow-2xl shadow-primary/5 sm:p-10"><div className="mb-8"><p className="text-sm font-semibold text-primary">Welcome back</p><h2 className="mt-2 font-serif text-3xl font-bold">Sign in to your desk</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Use your library account to continue.</p></div><div className="flex rounded-xl bg-muted p-1"><button onClick={() => setRole('admin')} className={cn('flex-1 rounded-lg py-2.5 text-sm font-semibold transition', role === 'admin' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>Admin preview</button><button onClick={() => setRole('student')} className={cn('flex-1 rounded-lg py-2.5 text-sm font-semibold transition', role === 'student' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>Student preview</button></div><label className="mt-7 block text-sm font-medium">Email address<input defaultValue={role === 'admin' ? 'admin@klbookhouse.in' : 'student@klbookhouse.in'} className="mt-2 h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" /></label><label className="mt-5 block text-sm font-medium">Password<div className="relative mt-2"><input type="password" defaultValue="library2026" className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" /><button aria-label="Show password" className="absolute right-3 top-3 text-muted-foreground"><CircleHelp className="size-5" /></button></div></label><button onClick={() => onLogin(role)} className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5">Continue as {role} <ArrowRight className="size-4" /></button><p className="mt-5 text-center text-xs text-muted-foreground">Demo mode is active. Firebase Auth + Firestore ready.</p></section>
+  return (
+    <div className="flex items-center gap-3">
+      <div className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+        <BookOpen className="size-5" />
+      </div>
+      <div>
+        <p className="font-serif text-lg font-bold leading-none tracking-tight">
+          KL Book House
+        </p>
+        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+          Library management
+        </p>
+      </div>
     </div>
-  </main>
+  )
 }
 
-function SeatMap({ shiftId, selectedSeat, onSelect, readonly = false }: { shiftId: string; selectedSeat: string; onSelect: (seat: string) => void; readonly?: boolean }) {
-  return <LibraryModelView onSelect={() => onSelect(selectedSeat || SEATS[0].seatNo)} />
+function Login({
+  onLogin,
+}: {
+  onLogin: (role: Role) => void
+}) {
+  const [role, setRole] = useState<Role>('admin')
+
+  const [email, setEmail] = useState('admin@klbookhouse.in')
+  const [password, setPassword] = useState('')
+
+  const [billNo, setBillNo] = useState('')
+  const [mobileNo, setMobileNo] = useState('')
+
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleAdminLogin = async () => {
+    if (!email.trim() || !password) {
+      setError('Please enter your admin email and password.')
+      return
+    }
+
+    if (!auth) {
+      setError('Firebase Authentication is not configured.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password)
+      onLogin('admin')
+    } catch (error) {
+      console.error('Admin login failed:', error)
+      setError('Invalid admin email or password.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleStudentLogin = async () => {
+    if (!billNo.trim() || !mobileNo.trim()) {
+      setError('Please enter your bill number and registered mobile number.')
+      return
+    }
+
+    if (!db) {
+      setError('Firestore is not configured.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const studentQuery = query(
+        collection(db, 'assignments'),
+        where('billNo', '==', billNo.trim()),
+        where('mobileNo', '==', mobileNo.trim()),
+      )
+
+      const snapshot = await getDocs(studentQuery)
+
+      if (snapshot.empty) {
+        setError('Bill number or mobile number is incorrect.')
+        return
+      }
+
+      // The student dashboard is loaded separately from Firestore.
+      // Successful matching means the student credentials are valid.
+      onLogin('student')
+    } catch (error) {
+      console.error('Student login failed:', error)
+      setError('Unable to verify your details. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (role === 'admin') {
+      await handleAdminLogin()
+    } else {
+      await handleStudentLogin()
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-[radial-gradient(circle_at_80%_10%,hsl(var(--accent)/.7),transparent_38%),linear-gradient(135deg,hsl(var(--background)),hsl(var(--muted)))] px-6 py-8 lg:px-12">
+      <header className="flex items-center justify-between">
+        <Logo />
+
+        <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
+          <ShieldCheck className="size-4 text-primary" />
+          Secure workspace
+        </div>
+      </header>
+
+      <div className="mx-auto grid min-h-[calc(100vh-120px)] max-w-6xl items-center gap-16 py-10 lg:grid-cols-[1.08fr_.92fr]">
+        <section className="max-w-xl">
+          <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-card/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[.16em] text-primary">
+            <span className="size-1.5 rounded-full bg-primary" />
+            Today at the library
+          </p>
+
+          <h1 className="font-serif text-5xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-7xl">
+            A quieter way to run your{' '}
+            <span className="text-primary">library.</span>
+          </h1>
+
+          <p className="mt-7 max-w-md text-base leading-7 text-muted-foreground">
+            Know every seat, every shift, and every renewal at a glance. Built
+            for the people who keep KL Book House moving.
+          </p>
+
+          <div className="mt-10 flex flex-wrap gap-6 text-sm text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <Users className="size-4 text-primary" />
+              57 seats
+            </span>
+
+            <span className="flex items-center gap-2">
+              <Clock3 className="size-4 text-primary" />
+              4 daily shifts
+            </span>
+
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-primary" />
+              Secure access
+            </span>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-border/70 bg-card p-8 shadow-2xl shadow-primary/5 sm:p-10">
+          <div className="mb-8">
+            <p className="text-sm font-semibold text-primary">Welcome back</p>
+
+            <h2 className="mt-2 font-serif text-3xl font-bold">
+              Sign in to your desk
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Admins use Firebase credentials. Students use their bill number
+              and registered mobile number.
+            </p>
+          </div>
+
+          {/* Admin / Student switch */}
+          <div className="flex rounded-xl bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setRole('admin')
+                setError('')
+              }}
+              className={cn(
+                'flex-1 rounded-lg py-2.5 text-sm font-semibold transition',
+                role === 'admin'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              Login as Admin
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setRole('student')
+                setError('')
+              }}
+              className={cn(
+                'flex-1 rounded-lg py-2.5 text-sm font-semibold transition',
+                role === 'student'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              Login as Student
+            </button>
+          </div>
+
+          {role === 'admin' ? (
+            <>
+              <label className="mt-7 block text-sm font-medium">
+                Admin email address
+
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="admin@klbookhouse.in"
+                  autoComplete="username"
+                  className="mt-2 h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                />
+              </label>
+
+              <label className="mt-5 block text-sm font-medium">
+                Password
+
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      void handleSubmit()
+                    }
+                  }}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  className="mt-2 h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className="mt-7 block text-sm font-medium">
+                Bill number
+
+                <input
+                  type="text"
+                  value={billNo}
+                  onChange={(event) => setBillNo(event.target.value)}
+                  placeholder="KL-1048"
+                  autoComplete="off"
+                  className="mt-2 h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                />
+              </label>
+
+              <label className="mt-5 block text-sm font-medium">
+                Registered mobile number
+
+                <input
+                  type="tel"
+                  value={mobileNo}
+                  onChange={(event) => setMobileNo(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      void handleSubmit()
+                    }
+                  }}
+                  placeholder="9876543210"
+                  autoComplete="tel"
+                  className="mt-2 h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                />
+              </label>
+            </>
+          )}
+
+          {error && (
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={loading}
+            className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading
+              ? 'Checking...'
+              : role === 'admin'
+                ? 'Continue as admin'
+                : 'Continue as student'}
+
+            {!loading && <ArrowRight className="size-4" />}
+          </button>
+
+          <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
+            {role === 'admin'
+              ? 'Only the two administrator accounts created in Firebase can access the admin dashboard.'
+              : 'Use the bill number and mobile number registered with the library.'}
+          </p>
+        </section>
+      </div>
+    </main>
+  )
 }
 
-/* legacy seat grid preserved below for fallback reference
-function LegacySeatMap({ shiftId, selectedSeat, onSelect, readonly = false }: { shiftId: string; selectedSeat: string; onSelect: (seat: string) => void; readonly?: boolean }) {
-  const assignmentFor = (seatNo: string) => getAssignment(seatNo, shiftId)
-  return <div className="relative min-h-[440px] overflow-hidden rounded-2xl border border-border bg-[#e9eee9] p-6 shadow-inner"><div className="absolute inset-0 opacity-40 [background-image:linear-gradient(hsl(var(--border)/.5)_1px,transparent_1px),linear-gradient(90deg,hsl(var(--border)/.5)_1px,transparent_1px)] [background-size:32px_32px]" /><div className="relative flex h-full min-h-[385px] flex-col justify-between"><div className="flex justify-between"><div className="rounded-lg border border-border bg-card px-3 py-2 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Reading room A</div><div className="rounded-lg border border-border bg-card px-3 py-2 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Window side</div></div><div className="mx-auto flex w-[80%] items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-primary/25 bg-card/40 py-3 text-xs font-semibold text-primary"><BookOpen className="size-4" /> Central reading aisle <BookOpen className="size-4" /></div><div className="grid grid-cols-6 gap-3 sm:gap-5">{SEATS.map((seat) => { const assignment = assignmentFor(seat.seatNo); const active = selectedSeat === seat.seatNo; return <button key={seat.seatNo} aria-label={`${seat.seatNo} ${assignment ? `occupied by ${assignment.studentName}` : 'vacant'}`} onClick={() => onSelect(seat.seatNo)} className={cn('group relative flex aspect-[1.15] flex-col items-center justify-center rounded-xl border-2 bg-card text-xs font-bold shadow-sm transition hover:-translate-y-1 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-primary/20', active ? 'border-primary ring-4 ring-primary/15' : 'border-border', assignment ? 'text-foreground' : 'text-muted-foreground')}><span className={cn('mb-1 size-2 rounded-full', assignment ? 'bg-primary' : 'bg-muted-foreground/30')} /><span>{seat.seatNo}</span>{assignment && <span className="mt-1 max-w-full truncate px-1 text-[9px] font-normal text-muted-foreground">{assignment.studentName.split(' ')[0]}</span>}<span className={cn('absolute -right-1 -top-1 hidden rounded-full border border-card px-1.5 py-0.5 text-[8px] font-bold text-primary-foreground group-hover:block', assignment ? 'bg-primary' : 'bg-muted-foreground')}>{assignment ? 'IN' : 'OPEN'}</span></button> })}</div><div className="flex justify-center gap-6 text-xs text-muted-foreground"><span className="flex items-center gap-2"><i className="size-2 rounded-full bg-primary" /> Occupied</span><span className="flex items-center gap-2"><i className="size-2 rounded-full bg-muted-foreground/30" /> Vacant</span>{!readonly && <span className="hidden items-center gap-2 sm:flex"><i className="size-2 rounded-full border border-primary" /> Selected</span>}</div></div></div>
+function SeatMap({
+  selectedSeat,
+  onSelect,
+}: {
+  shiftId: string
+  selectedSeat: string
+  onSelect: (seat: string) => void
+  readonly?: boolean
+}) {
+  return (
+    <LibraryModelView
+      onSelect={() => onSelect(selectedSeat || SEATS[0].seatNo)}
+    />
+  )
 }
-*/
 
-function Stat({ icon: Icon, label, value, detail, tone = 'default' }: { icon: any; label: string; value: string; detail: string; tone?: string }) { return <div className="rounded-2xl border border-border bg-card p-5"><div className="flex items-start justify-between"><div className="grid size-9 place-items-center rounded-xl bg-muted text-primary"><Icon className="size-4" /></div><span className={cn('rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider', tone === 'warn' ? 'bg-amber-100 text-amber-800' : 'bg-muted text-muted-foreground')}>{detail}</span></div><p className="mt-5 text-3xl font-bold tracking-tight">{value}</p><p className="mt-1 text-xs text-muted-foreground">{label}</p></div> }
+function Stat({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  tone = 'default',
+}: {
+  icon: any
+  label: string
+  value: string
+  detail: string
+  tone?: string
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-start justify-between">
+        <div className="grid size-9 place-items-center rounded-xl bg-muted text-primary">
+          <Icon className="size-4" />
+        </div>
 
-function AppShell({ role, onLogout, children }: { role: Role; onLogout: () => void; children: React.ReactNode }) { return <div className="min-h-screen bg-background"><aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-border bg-card px-5 py-6 lg:flex"><Logo /><nav className="mt-12 flex flex-col gap-2"><p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.2em] text-muted-foreground">Workspace</p><a className="flex items-center gap-3 rounded-xl bg-primary/10 px-3 py-3 text-sm font-semibold text-primary"><LayoutDashboard className="size-4" /> Overview</a><a className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-muted-foreground hover:bg-muted"><Users className="size-4" /> Students</a><a className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-muted-foreground hover:bg-muted"><FileText className="size-4" /> Payments & dues</a><a className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-muted-foreground hover:bg-muted"><Settings className="size-4" /> Settings</a></nav><div className="mt-auto rounded-2xl bg-muted p-4"><p className="text-xs font-semibold">Need a hand?</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Contact the support desk for account help.</p><button className="mt-3 flex items-center gap-1 text-xs font-semibold text-primary">Open help <ExternalLink className="size-3" /></button></div><button onClick={onLogout} className="mt-5 flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"><LogOut className="size-4" /> Sign out</button></aside><div className="lg:pl-64"><header className="flex h-20 items-center justify-between border-b border-border bg-card/90 px-6 backdrop-blur lg:px-10"><div className="flex items-center gap-3 lg:hidden"><Menu className="size-5" /><Logo /></div><div className="hidden lg:block"><p className="font-serif text-xl font-bold">{role === 'admin' ? 'Good morning, Admin' : 'Good morning, Aarav'}</p><p className="mt-1 text-xs text-muted-foreground">Monday, 08 June 2026 <span className="mx-2">•</span> KL Book House, New Delhi</p></div><div className="flex items-center gap-3"><button aria-label="Search" className="hidden size-10 place-items-center rounded-xl border border-border text-muted-foreground hover:bg-muted sm:grid"><Search className="size-4" /></button><button aria-label="Notifications" className="relative grid size-10 place-items-center rounded-xl border border-border text-muted-foreground hover:bg-muted"><Bell className="size-4" /><span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" /></button><div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-sm font-bold text-primary">{role === 'admin' ? 'AD' : 'AM'}</div></div></header>{children}</div></div> }
+        <span
+          className={cn(
+            'rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider',
+            tone === 'warn'
+              ? 'bg-amber-100 text-amber-800'
+              : 'bg-muted text-muted-foreground',
+          )}
+        >
+          {detail}
+        </span>
+      </div>
 
-function AssignmentPanel({ seatNo, shiftId, onClose, onSave, readonly }: { seatNo: string; shiftId: string; onClose: () => void; onSave: () => void; readonly?: boolean }) { const data = getAssignment(seatNo, shiftId); return <div className="fixed inset-0 z-30 flex items-end justify-end bg-foreground/20 backdrop-blur-[2px] sm:items-stretch"><div className="flex w-full max-w-lg flex-col overflow-y-auto border-l border-border bg-card p-6 shadow-2xl sm:p-8"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-primary">Seat details</p><h2 className="mt-2 font-serif text-3xl font-bold">{seatNo}</h2><p className="mt-1 text-sm text-muted-foreground">{SHIFTS.find(s => s.id === shiftId)?.name} shift · {SHIFTS.find(s => s.id === shiftId)?.time}</p></div><button onClick={onClose} aria-label="Close panel" className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground"><X className="size-4" /></button></div><div className={cn('mt-8 flex items-center gap-3 rounded-xl p-4', data ? 'bg-primary/10' : 'bg-muted')}><span className={cn('grid size-9 place-items-center rounded-full', data ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground')}>{data ? <Check className="size-4" /> : <Plus className="size-4" />}</span><div><p className="text-sm font-semibold">{data ? 'Seat occupied' : 'Seat available'}</p><p className="text-xs text-muted-foreground">{data ? `Assigned to ${data.studentName}` : 'No assignment for this shift'}</p></div></div>{data || readonly ? <div className="mt-8 flex flex-col gap-5">{[['Student name', data?.studentName || 'Available'],['Bill number', data?.billNo || '—'],...(!readonly ? [['Mobile number', data?.mobileNo || '—']] : []),['Admission date', data?.admissionDate || '—'],['Expiry date', data?.expiryDate || '—']].map(([label, value]) => <div key={label}><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p><p className="mt-1 border-b border-border pb-3 text-sm font-medium">{value}</p></div>)}{data && <div className="flex items-center justify-between rounded-xl bg-muted p-4"><span className="text-sm font-medium">Payment status</span><span className={cn('rounded-full px-2.5 py-1 text-xs font-bold', data.dueStatus === 'paid' ? 'bg-primary/15 text-primary' : 'bg-amber-100 text-amber-800')}>{data.dueStatus === 'paid' ? 'Paid in full' : `₹${data.amountDue.toLocaleString('en-IN')} due`}</span></div>}</div> : <div className="mt-8 flex flex-col gap-5">{[['Bill number','KL-____'],['Student name','Full name'],['Admission date','2026-06-08'],['Expiry date','2026-07-08'],['Mobile number','+91']].map(([label, placeholder]) => <label key={label} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}<input placeholder={placeholder} className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary" /></label>)}<label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Shift<select defaultValue={shiftId} className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary">{SHIFTS.map(s => <option key={s.id} value={s.id}>{s.name} · {s.time}</option>)}</select></label><button onClick={onSave} className="mt-3 h-12 rounded-xl bg-primary text-sm font-semibold text-primary-foreground">Save assignment</button></div>}{data && !readonly && <button className="mt-8 h-11 rounded-xl border border-border text-sm font-semibold hover:bg-muted">Edit assignment</button>}<p className="mt-auto pt-8 text-center text-xs leading-5 text-muted-foreground">Changes sync to Firestore when Firebase is configured.<br />Demo data is currently active.</p></div></div> }
+      <p className="mt-5 text-3xl font-bold tracking-tight">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+    </div>
+  )
+}
 
-function Dashboard({ role, onLogout }: { role: Role; onLogout: () => void }) { const [shiftId, setShiftId] = useState('morning'); const [selectedSeat, setSelectedSeat] = useState('A-01'); const [panelOpen, setPanelOpen] = useState(false); const [saved, setSaved] = useState(false); const readonly = role === 'student'; const occupancy = useMemo(() => DEMO_ASSIGNMENTS.filter(a => a.shiftId === shiftId).length, [shiftId]); const expiring = DEMO_ASSIGNMENTS.filter(a => getExpiryTone(a.expiryDate) === 'soon'); const dues = DEMO_ASSIGNMENTS.filter(a => a.dueStatus !== 'paid'); return <AppShell role={role} onLogout={onLogout}><main className="mx-auto max-w-[1500px] p-6 lg:p-10"><div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><span>Workspace</span><ChevronDown className="size-3" /><span className="text-primary">Overview</span></div><h1 className="mt-3 font-serif text-4xl font-bold tracking-tight">{readonly ? 'Your library overview' : 'Library overview'}</h1><p className="mt-2 text-sm text-muted-foreground">{readonly ? 'Find your seat and keep an eye on your membership.' : 'A clear view of today\'s seats, shifts, and follow-ups.'}</p></div><div className="flex items-center gap-2 rounded-xl border border-border bg-card p-1">{readonly ? <span className="px-3 py-2 text-xs font-semibold text-muted-foreground">Read-only access</span> : <><span className="px-3 py-2 text-xs font-semibold text-muted-foreground">Last synced 2m ago</span><button className="rounded-lg bg-muted px-3 py-2 text-xs font-semibold">Refresh</button></>}</div></div>{!readonly && <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat icon={LayoutDashboard} label="Total seats" value={String(SEATS.length)} detail="4 shifts" /><Stat icon={Users} label="Occupied right now" value="29" detail="40% full" /><Stat icon={Clock3} label="Renewals this week" value="06" detail="Needs action" tone="warn" /><Stat icon={CreditCard} label="Outstanding dues" value="₹2,500" detail="3 students" tone="warn" /></div>}<div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]"><section className="min-w-0 rounded-2xl border border-border bg-card p-5 lg:p-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><div className="flex items-center gap-2"><h2 className="font-serif text-2xl font-bold">Seat map</h2><span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">Live preview</span></div><p className="mt-1 text-xs text-muted-foreground">Select a seat to view {readonly ? 'membership details' : 'or update its assignment'}.</p></div><div className="flex gap-1 rounded-xl bg-muted p-1">{SHIFTS.map(shift => <button key={shift.id} onClick={() => { setShiftId(shift.id); setSelectedSeat('A-01') }} className={cn('rounded-lg px-3 py-2 text-xs font-semibold transition', shiftId === shift.id ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground')}><span className="hidden sm:inline">{shift.name}</span><span className="sm:hidden">{shift.short}</span></button>)}</div></div><div className="mt-6"><SeatMap shiftId={shiftId} selectedSeat={selectedSeat} onSelect={(seat) => { setSelectedSeat(seat); setPanelOpen(true) }} readonly={readonly} /></div><div className="mt-5 flex items-center justify-between"><p className="text-xs text-muted-foreground"><strong className="text-foreground">{occupancy}</strong> occupied · <strong className="text-foreground">{18 - occupancy}</strong> vacant in {SHIFTS.find(s => s.id === shiftId)?.name} shift</p><button onClick={() => setPanelOpen(true)} className="flex items-center gap-2 text-xs font-semibold text-primary">View selected seat <ArrowRight className="size-3" /></button></div></section><aside className="flex flex-col gap-6">{readonly ? <div className="rounded-2xl border border-border bg-card p-6"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-primary">Your membership</p><h2 className="mt-2 font-serif text-2xl font-bold">Aarav Mehta</h2></div><div className="rounded-xl bg-primary/10 px-2 py-1 text-[10px] font-bold text-primary">ACTIVE</div></div><div className="mt-6 flex flex-col gap-4 text-sm"><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Your seat</span><strong>A-01</strong></div><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Shift</span><strong>Morning</strong></div><div className="flex justify-between"><span className="text-muted-foreground">Valid until</span><strong>18 Jul 2026</strong></div></div></div> : <><div className="rounded-2xl border border-border bg-card p-6"><div className="flex items-center justify-between"><h2 className="font-serif text-xl font-bold">Renewals to watch</h2><button className="text-xs font-semibold text-primary">See all</button></div><div className="mt-5 flex flex-col gap-4">{expiring.slice(0, 3).map(item => <div key={item.billNo} className="flex items-center gap-3"><div className="grid size-9 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">{item.studentName.split(' ').map(n => n[0]).join('')}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.studentName}</p><p className="text-xs text-muted-foreground">Seat {item.seatNo} · {item.expiryDate}</p></div><span className="text-xs font-bold text-amber-700">{getExpiryLabel(item.expiryDate)}</span></div>)}</div></div><div className="rounded-2xl border border-border bg-card p-6"><div className="flex items-center justify-between"><h2 className="font-serif text-xl font-bold">Outstanding dues</h2><span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800">{dues.length} open</span></div><div className="mt-5 flex flex-col gap-3">{dues.map(item => <div key={item.billNo} className="flex items-center justify-between rounded-xl bg-muted p-3"><div><p className="text-sm font-semibold">{item.studentName}</p><p className="text-xs text-muted-foreground">Seat {item.seatNo}</p></div><strong className="text-sm text-amber-800">₹{item.amountDue.toLocaleString('en-IN')}</strong></div>)}</div></div></>}</aside></div>{!readonly && <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]"><div className="rounded-2xl border border-border bg-card p-6"><div className="flex items-center justify-between"><div><h2 className="font-serif text-xl font-bold">Shift occupancy</h2><p className="mt-1 text-xs text-muted-foreground">Current utilization across the day</p></div><button className="grid size-9 place-items-center rounded-lg bg-muted"><ExternalLink className="size-4" /></button></div><div className="mt-6 flex flex-col gap-4">{SHIFTS.map(shift => { const count = DEMO_ASSIGNMENTS.filter(a => a.shiftId === shift.id).length; return <div key={shift.id} className="flex items-center gap-4"><span className="w-20 text-xs font-semibold">{shift.name}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${(count / 18) * 100}%` }} /></div><span className="w-12 text-right text-xs font-bold">{count}/18</span></div>})}</div></div><div className="rounded-2xl bg-primary p-6 text-primary-foreground"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-primary-foreground/70">Quick action</p><h2 className="mt-2 font-serif text-2xl font-bold">Keep the floor moving.</h2></div><Plus className="size-5" /></div><p className="mt-3 max-w-xs text-sm leading-6 text-primary-foreground/75">Assign a vacant seat or follow up on a renewal before it becomes a gap.</p><button onClick={() => { setSelectedSeat('A-03'); setPanelOpen(true) }} className="mt-6 flex items-center gap-2 rounded-xl bg-card px-4 py-3 text-xs font-bold text-primary">Assign a seat <ArrowRight className="size-4" /></button></div></div>}{readonly && <div className="mt-6 flex flex-col justify-between gap-5 rounded-2xl border border-border bg-card p-6 sm:flex-row sm:items-center"><div><div className="flex items-center gap-2"><Phone className="size-4 text-primary" /><h2 className="font-serif text-xl font-bold">Need help with your membership?</h2></div><p className="mt-2 text-sm text-muted-foreground">{ADMIN_CONTACT.hours} · {ADMIN_CONTACT.email}</p></div><a href={`tel:${ADMIN_CONTACT.phone}`} className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground"><Phone className="size-4" /> {ADMIN_CONTACT.phone}</a></div>}</main>{panelOpen && <AssignmentPanel seatNo={selectedSeat} shiftId={shiftId} readonly={readonly} onClose={() => setPanelOpen(false)} onSave={() => { setSaved(true); setPanelOpen(false) }} />}{saved && <div className="fixed bottom-6 right-6 flex items-center gap-3 rounded-xl bg-foreground px-4 py-3 text-sm text-background shadow-xl"><Check className="size-4 text-primary" /> Assignment saved in demo mode<button onClick={() => setSaved(false)}><X className="size-4" /></button></div>}</AppShell> }
+function AppShell({
+  role,
+  onLogout,
+  children,
+}: {
+  role: Role
+  onLogout: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="min-h-screen bg-background">
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-border bg-card px-5 py-6 lg:flex">
+        <Logo />
 
-export default function Page() { const [view, setView] = useState<ViewMode>('login'); if (view === 'login') return <Login onLogin={setView} />; return <Dashboard role={view} onLogout={() => setView('login')} /> }
+        <nav className="mt-12 flex flex-col gap-2">
+          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.2em] text-muted-foreground">
+            Workspace
+          </p>
+
+          <a className="flex items-center gap-3 rounded-xl bg-primary/10 px-3 py-3 text-sm font-semibold text-primary">
+            <LayoutDashboard className="size-4" />
+            Overview
+          </a>
+
+          <a className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-muted-foreground hover:bg-muted">
+            <Users className="size-4" />
+            Students
+          </a>
+
+          <a className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-muted-foreground hover:bg-muted">
+            <FileText className="size-4" />
+            Payments & dues
+          </a>
+
+          <a className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-muted-foreground hover:bg-muted">
+            <Settings className="size-4" />
+            Settings
+          </a>
+        </nav>
+
+        <div className="mt-auto rounded-2xl bg-muted p-4">
+          <p className="text-xs font-semibold">Need a hand?</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Contact the support desk for account help.
+          </p>
+
+          <button className="mt-3 flex items-center gap-1 text-xs font-semibold text-primary">
+            Open help
+            <ExternalLink className="size-3" />
+          </button>
+        </div>
+
+        <button
+          onClick={onLogout}
+          className="mt-5 flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <LogOut className="size-4" />
+          Sign out
+        </button>
+      </aside>
+
+      <div className="lg:pl-64">
+        <header className="flex h-20 items-center justify-between border-b border-border bg-card/90 px-6 backdrop-blur lg:px-10">
+          <div className="flex items-center gap-3 lg:hidden">
+            <Menu className="size-5" />
+            <Logo />
+          </div>
+
+          <div className="hidden lg:block">
+            <p className="font-serif text-xl font-bold">Good morning, Admin</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              KL Book House
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              aria-label="Search"
+              className="hidden size-10 place-items-center rounded-xl border border-border text-muted-foreground hover:bg-muted sm:grid"
+            >
+              <Search className="size-4" />
+            </button>
+
+            <button
+              aria-label="Notifications"
+              className="relative grid size-10 place-items-center rounded-xl border border-border text-muted-foreground hover:bg-muted"
+            >
+              <Bell className="size-4" />
+              <span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" />
+            </button>
+
+            <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
+              AD
+            </div>
+          </div>
+        </header>
+
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function AssignmentPanel({
+  seatNo,
+  shiftId,
+  assignments,
+  onClose,
+  onSaved,
+}: {
+  seatNo: string
+  shiftId: string
+  assignments: Assignment[]
+  onClose: () => void
+  onSaved: () => Promise<void>
+}) {
+  const existing = assignments.find(
+    (item) => item.seatNo === seatNo && item.shiftId === shiftId,
+  )
+
+  const [studentName, setStudentName] = useState(existing?.studentName ?? '')
+  const [billNo, setBillNo] = useState(existing?.billNo ?? '')
+  const [admissionDate, setAdmissionDate] = useState(
+    existing?.admissionDate ?? '',
+  )
+  const [expiryDate, setExpiryDate] = useState(existing?.expiryDate ?? '')
+  const [mobileNo, setMobileNo] = useState(existing?.mobileNo ?? '')
+  const [amountDue, setAmountDue] = useState(
+    existing?.amountDue?.toString() ?? '0',
+  )
+  const [dueStatus, setDueStatus] = useState<
+    'paid' | 'partial' | 'due'
+  >(existing?.dueStatus ?? 'paid')
+  const [selectedShift, setSelectedShift] = useState(shiftId)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSave = async () => {
+    if (!studentName.trim() || !billNo.trim()) {
+      setError('Student name and bill number are required.')
+      return
+    }
+
+    if (!db) {
+      setError('Firestore is not configured.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+
+    const assignmentData = {
+      seatNo,
+      studentName: studentName.trim(),
+      billNo: billNo.trim(),
+      shiftId: selectedShift,
+      admissionDate,
+      expiryDate,
+      mobileNo: mobileNo.trim(),
+      amountDue: Number(amountDue) || 0,
+      dueStatus,
+    }
+
+    try {
+      if (existing?.id) {
+        await updateDoc(doc(db, 'assignments', existing.id), assignmentData)
+      } else {
+        await addDoc(collection(db, 'assignments'), assignmentData)
+      }
+
+      await onSaved()
+      onClose()
+    } catch (saveError) {
+      console.error('Failed to save assignment:', saveError)
+      setError('Could not save the assignment. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!existing?.id || !db) return
+
+    const confirmed = window.confirm(
+      `Remove ${existing.studentName} from seat ${existing.seatNo}?`,
+    )
+
+    if (!confirmed) return
+
+    setSaving(true)
+    setError('')
+
+    try {
+      await deleteDoc(doc(db, 'assignments', existing.id))
+      await onSaved()
+      onClose()
+    } catch (deleteError) {
+      console.error('Failed to delete assignment:', deleteError)
+      setError('Could not remove the assignment.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-end bg-foreground/20 backdrop-blur-[2px] sm:items-stretch">
+      <div className="flex w-full max-w-lg flex-col overflow-y-auto border-l border-border bg-card p-6 shadow-2xl sm:p-8">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">
+              Seat details
+            </p>
+            <h2 className="mt-2 font-serif text-3xl font-bold">{seatNo}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {SHIFTS.find((shift) => shift.id === selectedShift)?.name} shift ·{' '}
+              {SHIFTS.find((shift) => shift.id === selectedShift)?.time}
+            </p>
+          </div>
+
+          <button
+            onClick={onClose}
+            aria-label="Close panel"
+            className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div
+          className={cn(
+            'mt-8 flex items-center gap-3 rounded-xl p-4',
+            existing ? 'bg-primary/10' : 'bg-muted',
+          )}
+        >
+          <span
+            className={cn(
+              'grid size-9 place-items-center rounded-full',
+              existing
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-card text-muted-foreground',
+            )}
+          >
+            {existing ? (
+              <Check className="size-4" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+          </span>
+
+          <div>
+            <p className="text-sm font-semibold">
+              {existing ? 'Seat occupied' : 'Seat available'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {existing
+                ? `Assigned to ${existing.studentName}`
+                : 'Enter a student to assign this seat'}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-col gap-5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Student name
+            <input
+              value={studentName}
+              onChange={(event) => setStudentName(event.target.value)}
+              placeholder="Full name"
+              className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+            />
+          </label>
+
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Bill number
+            <input
+              value={billNo}
+              onChange={(event) => setBillNo(event.target.value)}
+              placeholder="KL-0001"
+              className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+            />
+          </label>
+
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Mobile number
+            <input
+              value={mobileNo}
+              onChange={(event) => setMobileNo(event.target.value)}
+              placeholder="+91"
+              className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+            />
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Admission date
+              <input
+                type="date"
+                value={admissionDate}
+                onChange={(event) => setAdmissionDate(event.target.value)}
+                className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+              />
+            </label>
+
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Expiry date
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(event) => setExpiryDate(event.target.value)}
+                className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+              />
+            </label>
+          </div>
+
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Shift
+            <select
+              value={selectedShift}
+              onChange={(event) => setSelectedShift(event.target.value)}
+              className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+            >
+              {SHIFTS.map((shift) => (
+                <option key={shift.id} value={shift.id}>
+                  {shift.name} · {shift.time}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Amount due
+              <input
+                type="number"
+                min="0"
+                value={amountDue}
+                onChange={(event) => setAmountDue(event.target.value)}
+                className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+              />
+            </label>
+
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Payment status
+              <select
+                value={dueStatus}
+                onChange={(event) =>
+                  setDueStatus(
+                    event.target.value as 'paid' | 'partial' | 'due',
+                  )
+                }
+                className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+              >
+                <option value="paid">Paid</option>
+                <option value="partial">Partial</option>
+                <option value="due">Due</option>
+              </select>
+            </label>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <button
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="mt-3 h-12 rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving
+              ? 'Saving...'
+              : existing
+                ? 'Update assignment'
+                : 'Save assignment'}
+          </button>
+
+          {existing && (
+            <button
+              onClick={() => void handleDelete()}
+              disabled={saving}
+              className="h-11 rounded-xl border border-destructive/30 text-sm font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-60"
+            >
+              Remove assignment
+            </button>
+          )}
+        </div>
+
+        <p className="mt-auto pt-8 text-center text-xs leading-5 text-muted-foreground">
+          {existing
+            ? 'Changes are saved to Firestore.'
+            : 'This assignment will be stored in Firestore.'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function Dashboard({
+  role,
+  onLogout,
+  student,
+}: {
+  role: Role
+  onLogout: () => void
+  student?: Assignment
+}) {
+  const [shiftId, setShiftId] = useState(student?.shiftId ?? 'morning')
+  const [selectedSeat, setSelectedSeat] = useState(student?.seatNo ?? 'A-01')
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [loadingData, setLoadingData] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  const isStudent = role === 'student'
+
+  const loadAssignments = async () => {
+    if (!db) {
+      setLoadError('Firestore is not configured.')
+      setLoadingData(false)
+      return
+    }
+
+    try {
+      setLoadingData(true)
+      setLoadError('')
+
+      if (isStudent && student?.billNo && student.mobileNo) {
+        const studentQuery = query(
+          collection(db, 'assignments'),
+          where('billNo', '==', student.billNo),
+          where('mobileNo', '==', student.mobileNo),
+        )
+
+        const snapshot = await getDocs(studentQuery)
+
+        const data = snapshot.docs.map((assignmentDoc) => ({
+          id: assignmentDoc.id,
+          ...assignmentDoc.data(),
+        })) as Assignment[]
+
+        setAssignments(data)
+      } else {
+        const snapshot = await getDocs(collection(db, 'assignments'))
+
+        const data = snapshot.docs.map((assignmentDoc) => ({
+          id: assignmentDoc.id,
+          ...assignmentDoc.data(),
+        })) as Assignment[]
+
+        setAssignments(data)
+      }
+    } catch (error) {
+      console.error('Failed to load assignments:', error)
+      setLoadError(
+        'Could not load library data. Check your Firestore configuration and rules.',
+      )
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadAssignments()
+  }, [])
+
+  const occupancy = useMemo(
+    () => assignments.filter((item) => item.shiftId === shiftId).length,
+    [assignments, shiftId],
+  )
+
+  const expiring = useMemo(
+    () =>
+      assignments.filter(
+        (item) => getExpiryTone(item.expiryDate) === 'soon',
+      ),
+    [assignments],
+  )
+
+  const dues = useMemo(
+    () => assignments.filter((item) => item.dueStatus !== 'paid'),
+    [assignments],
+  )
+
+  const totalDue = useMemo(
+    () => dues.reduce((total, item) => total + (item.amountDue || 0), 0),
+    [dues],
+  )
+
+  const handleLogout = async () => {
+    try {
+      if (auth && !isStudent) {
+        await signOut(auth)
+      }
+    } catch (error) {
+      console.error('Logout failed:', error)
+    } finally {
+      onLogout()
+    }
+  }
+
+  const handleSaved = async () => {
+    await loadAssignments()
+    setSaved(true)
+  }
+
+  return (
+    <AppShell role={role} onLogout={() => void handleLogout()}>
+      <main className="mx-auto max-w-[1500px] p-6 lg:p-10">
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+              <span>{isStudent ? 'Student' : 'Workspace'}</span>
+              <ChevronDown className="size-3" />
+              <span className="text-primary">Overview</span>
+            </div>
+
+            <h1 className="mt-3 font-serif text-4xl font-bold tracking-tight">
+              {isStudent ? 'Your library overview' : 'Library overview'}
+            </h1>
+
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isStudent
+                ? 'View your membership, seat and payment information.'
+                : 'Manage your real library data, seats, shifts, and payments.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-1">
+            <span className="px-3 py-2 text-xs font-semibold text-muted-foreground">
+              {loadingData ? 'Loading...' : 'Live Firestore data'}
+            </span>
+
+            <button
+              onClick={() => void loadAssignments()}
+              className="rounded-lg bg-muted px-3 py-2 text-xs font-semibold"
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {loadError && (
+          <div className="mt-6 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="size-4 shrink-0" />
+            {loadError}
+          </div>
+        )}
+
+        {!isStudent ? (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat
+              icon={LayoutDashboard}
+              label="Total seats"
+              value={String(SEATS.length)}
+              detail={`${SHIFTS.length} shifts`}
+            />
+
+            <Stat
+              icon={Users}
+              label={`Occupied in ${SHIFTS.find((s) => s.id === shiftId)?.name}`}
+              value={String(occupancy)}
+              detail={`${Math.round((occupancy / SEATS.length) * 100)}% full`}
+            />
+
+            <Stat
+              icon={Clock3}
+              label="Renewals to watch"
+              value={String(expiring.length).padStart(2, '0')}
+              detail="Needs action"
+              tone="warn"
+            />
+
+            <Stat
+              icon={CreditCard}
+              label="Outstanding dues"
+              value={`₹${totalDue.toLocaleString('en-IN')}`}
+              detail={`${dues.length} students`}
+              tone="warn"
+            />
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat
+              icon={LayoutDashboard}
+              label="Your seat"
+              value={student?.seatNo ?? '—'}
+              detail={student?.shiftId ?? '—'}
+            />
+
+            <Stat
+              icon={Clock3}
+              label="Valid until"
+              value={student?.expiryDate ?? '—'}
+              detail={student ? getExpiryLabel(student.expiryDate) : '—'}
+            />
+
+            <Stat
+              icon={CreditCard}
+              label="Payment status"
+              value={student?.dueStatus === 'paid' ? 'Paid' : 'Due'}
+              detail={
+                student?.amountDue
+                  ? `₹${student.amountDue.toLocaleString('en-IN')}`
+                  : 'No dues'
+              }
+              tone={student?.dueStatus === 'paid' ? 'default' : 'warn'}
+            />
+
+            <Stat
+              icon={Users}
+              label="Student"
+              value={student?.studentName ?? '—'}
+              detail={student?.billNo ?? '—'}
+            />
+          </div>
+        )}
+
+        <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="min-w-0 rounded-2xl border border-border bg-card p-5 lg:p-6">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-serif text-2xl font-bold">Seat map</h2>
+
+                  <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                    Live
+                  </span>
+                </div>
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isStudent
+                    ? 'View your assigned seat.'
+                    : 'Select a seat to add, edit or remove an assignment.'}
+                </p>
+              </div>
+
+              <div className="flex gap-1 rounded-xl bg-muted p-1">
+                {SHIFTS.map((shift) => (
+                  <button
+                    key={shift.id}
+                    onClick={() => {
+                      setShiftId(shift.id)
+                      if (!isStudent) {
+                        setSelectedSeat('A-01')
+                      } else if (student?.shiftId === shift.id) {
+                        setSelectedSeat(student.seatNo)
+                      }
+                    }}
+                    className={cn(
+                      'rounded-lg px-3 py-2 text-xs font-semibold transition',
+                      shiftId === shift.id
+                        ? 'bg-card text-primary shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <span className="hidden sm:inline">{shift.name}</span>
+                    <span className="sm:hidden">{shift.short}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <SeatMap
+                shiftId={shiftId}
+                selectedSeat={selectedSeat}
+                onSelect={(seat) => {
+                  setSelectedSeat(seat)
+                  setPanelOpen(true)
+                }}
+                readonly={isStudent}
+              />
+            </div>
+
+            {!isStudent && (
+              <div className="mt-5 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">{occupancy}</strong>{' '}
+                  occupied ·{' '}
+                  <strong className="text-foreground">
+                    {SEATS.length - occupancy}
+                  </strong>{' '}
+                  vacant in{' '}
+                  <strong className="text-foreground">
+                    {SHIFTS.find((s) => s.id === shiftId)?.name}
+                  </strong>{' '}
+                  shift
+                </p>
+
+                <button
+                  onClick={() => setPanelOpen(true)}
+                  className="flex items-center gap-2 text-xs font-semibold text-primary"
+                >
+                  View selected seat
+                  <ArrowRight className="size-3" />
+                </button>
+              </div>
+            )}
+          </section>
+
+          <aside className="flex flex-col gap-6">
+            {isStudent ? (
+              <div className="rounded-2xl border border-border bg-card p-6">
+                <p className="text-xs font-bold uppercase tracking-wider text-primary">
+                  Your membership
+                </p>
+
+                <h2 className="mt-2 font-serif text-2xl font-bold">
+                  {student?.studentName ?? 'Student'}
+                </h2>
+
+                <div className="mt-6 flex flex-col gap-4 text-sm">
+                  <div className="flex justify-between border-b border-border pb-3">
+                    <span className="text-muted-foreground">
+                      Bill number
+                    </span>
+                    <strong>{student?.billNo ?? '—'}</strong>
+                  </div>
+
+                  <div className="flex justify-between border-b border-border pb-3">
+                    <span className="text-muted-foreground">Seat</span>
+                    <strong>{student?.seatNo ?? '—'}</strong>
+                  </div>
+
+                  <div className="flex justify-between border-b border-border pb-3">
+                    <span className="text-muted-foreground">Shift</span>
+                    <strong>
+                      {SHIFTS.find((s) => s.id === student?.shiftId)?.name ??
+                        '—'}
+                    </strong>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      Valid until
+                    </span>
+                    <strong>{student?.expiryDate ?? '—'}</strong>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-2xl border border-border bg-card p-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-serif text-xl font-bold">
+                      Renewals to watch
+                    </h2>
+
+                    <span className="text-xs font-semibold text-primary">
+                      {expiring.length}
+                    </span>
+                  </div>
+
+                  <div className="mt-5 flex flex-col gap-4">
+                    {expiring.length === 0 ? (
+                      <p className="rounded-xl bg-muted p-4 text-sm text-muted-foreground">
+                        No upcoming renewals.
+                      </p>
+                    ) : (
+                      expiring.slice(0, 5).map((item) => (
+                        <div
+                          key={item.id ?? item.billNo}
+                          className="flex items-center gap-3"
+                        >
+                          <div className="grid size-9 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">
+                            {item.studentName
+                              .split(' ')
+                              .map((name) => name[0])
+                              .join('')
+                              .slice(0, 2)}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">
+                              {item.studentName}
+                            </p>
+
+                            <p className="text-xs text-muted-foreground">
+                              Seat {item.seatNo} · {item.expiryDate}
+                            </p>
+                          </div>
+
+                          <span className="text-xs font-bold text-amber-700">
+                            {getExpiryLabel(item.expiryDate)}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-card p-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-serif text-xl font-bold">
+                      Outstanding dues
+                    </h2>
+
+                    <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800">
+                      {dues.length} open
+                    </span>
+                  </div>
+
+                  <div className="mt-5 flex flex-col gap-3">
+                    {dues.length === 0 ? (
+                      <p className="rounded-xl bg-muted p-4 text-sm text-muted-foreground">
+                        No outstanding dues.
+                      </p>
+                    ) : (
+                      dues.map((item) => (
+                        <div
+                          key={item.id ?? item.billNo}
+                          className="flex items-center justify-between rounded-xl bg-muted p-3"
+                        >
+                          <div>
+                            <p className="text-sm font-semibold">
+                              {item.studentName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Seat {item.seatNo}
+                            </p>
+                          </div>
+
+                          <strong className="text-sm text-amber-800">
+                            ₹{item.amountDue.toLocaleString('en-IN')}
+                          </strong>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
+
+        {!isStudent && (
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-serif text-xl font-bold">
+                    Shift occupancy
+                  </h2>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Current utilization across the day
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => void loadAssignments()}
+                  className="grid size-9 place-items-center rounded-lg bg-muted"
+                  aria-label="Refresh occupancy"
+                >
+                  <ExternalLink className="size-4" />
+                </button>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-4">
+                {SHIFTS.map((shift) => {
+                  const count = assignments.filter(
+                    (item) => item.shiftId === shift.id,
+                  ).length
+
+                  return (
+                    <div
+                      key={shift.id}
+                      className="flex items-center gap-4"
+                    >
+                      <span className="w-20 text-xs font-semibold">
+                        {shift.name}
+                      </span>
+
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{
+                            width: `${Math.min(
+                              (count / SEATS.length) * 100,
+                              100,
+                            )}%`,
+                          }}
+                        />
+                      </div>
+
+                      <span className="w-16 text-right text-xs font-bold">
+                        {count}/{SEATS.length}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-primary p-6 text-primary-foreground">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[.16em] text-primary-foreground/70">
+                    Quick action
+                  </p>
+
+                  <h2 className="mt-2 font-serif text-2xl font-bold">
+                    Add a student.
+                  </h2>
+                </div>
+
+                <Plus className="size-5" />
+              </div>
+
+              <p className="mt-3 max-w-xs text-sm leading-6 text-primary-foreground/75">
+                Assign a vacant seat and save the student's details directly
+                to Firestore.
+              </p>
+
+              <button
+                onClick={() => {
+                  setSelectedSeat('A-01')
+                  setShiftId('morning')
+                  setPanelOpen(true)
+                }}
+                className="mt-6 flex items-center gap-2 rounded-xl bg-card px-4 py-3 text-xs font-bold text-primary"
+              >
+                Assign a seat
+                <ArrowRight className="size-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-col justify-between gap-5 rounded-2xl border border-border bg-card p-6 sm:flex-row sm:items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <Phone className="size-4 text-primary" />
+              <h2 className="font-serif text-xl font-bold">
+                Library support
+              </h2>
+            </div>
+
+            <p className="mt-2 text-sm text-muted-foreground">
+              {ADMIN_CONTACT.hours} · {ADMIN_CONTACT.email}
+            </p>
+          </div>
+
+          <a
+            href={`tel:${ADMIN_CONTACT.phone}`}
+            className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground"
+          >
+            <Phone className="size-4" />
+            {ADMIN_CONTACT.phone}
+          </a>
+        </div>
+      </main>
+
+      {panelOpen && (
+        <AssignmentPanel
+          seatNo={selectedSeat}
+          shiftId={shiftId}
+          assignments={assignments}
+          onClose={() => setPanelOpen(false)}
+          onSaved={handleSaved}
+        />
+      )}
+
+      {saved && (
+        <div className="fixed bottom-6 right-6 flex items-center gap-3 rounded-xl bg-foreground px-4 py-3 text-sm text-background shadow-xl">
+          <Check className="size-4 text-primary" />
+          Assignment saved to Firestore
+
+          <button
+            onClick={() => setSaved(false)}
+            aria-label="Close message"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
+    </AppShell>
+  )
+}
+
+export default function Page() {
+  const [view, setView] = useState<ViewMode>('login')
+
+  if (view === 'login') {
+    return <Login onLogin={setView} />
+  }
+
+  return (
+    <Dashboard
+      role={view}
+      onLogout={() => setView('login')}
+    />
+  )
+}
