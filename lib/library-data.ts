@@ -59,10 +59,8 @@ export type Assignment = {
 export type Shift = (typeof SHIFTS)[number]
 
 // Only admin login is required
-export type Role = 'admin'
-
-// Application views
-export type ViewMode = 'login' | 'admin'
+export type Role = 'admin' | 'student'
+export type ViewMode = 'login' | 'admin' | 'student'
 
 // Firebase configuration information
 export function getFirebaseSetup() {
