@@ -1,5 +1,6 @@
 'use client'
 
+
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
@@ -23,13 +24,14 @@ import {
   getExpiryLabel,
   getExpiryTone,
   type Assignment,
+  type Shift,
 } from '@/lib/library-data'
 import { auth, db } from '@/lib/firebase'
 import AssignmentPanel from './AssignmentPanel'
 import { AppShell, Clock3, SeatMap, Stat, mapAssignmentDoc } from './DashboardShared'
 
 export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
-  const [shiftId, setShiftId] = useState(SHIFTS[0]?.id ?? 'morning')
+  const [shiftId, setShiftId] = useState<Shift['id']>(SHIFTS[0]?.id ?? 'morning')
   const [selectedSeat, setSelectedSeat] = useState('1')
   const [panelOpen, setPanelOpen] = useState(false)
   const [saved, setSaved] = useState(false)
