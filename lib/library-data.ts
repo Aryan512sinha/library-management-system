@@ -25,13 +25,10 @@ export const SHIFTS = [
   },
 ] as const
 
-// 57 physical library seats
+// 57 physical library seats — simple numeric IDs, 1 through 57
 export const SEATS = Array.from({ length: 57 }, (_, index) => ({
-  seatNo: `${String.fromCharCode(65 + Math.floor(index / 6))}-${String(
-    (index % 6) + 1
-  ).padStart(2, '0')}`,
-  row: String.fromCharCode(65 + Math.floor(index / 6)),
-  number: (index % 6) + 1,
+  seatNo: String(index + 1),
+  number: index + 1,
 }))
 
 // Library contact information
@@ -80,7 +77,9 @@ export const MODEL_URL =
 
 export const MODEL_LOCAL_URL = '/models/kl_boox_house_5.glb'
 
-// Coordinates for the 57 seats in the 3D/library layout
+// Coordinates for the 57 seats in the 3D/library layout.
+// Still laid out visually in a 6-per-row grid — this is purely for
+// positioning on screen and does not affect the seat's ID/number.
 export const SEAT_COORDS = SEATS.map((seat, index) => ({
   ...seat,
   x: 13 + (index % 6) * 12,
@@ -128,6 +127,4 @@ export function getExpiryTone(date: string) {
   }
 
   return 'active'
-
-  
 }
