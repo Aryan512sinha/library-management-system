@@ -1,6 +1,5 @@
 'use client'
 
-
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
@@ -30,7 +29,15 @@ import { auth, db } from '@/lib/firebase'
 import AssignmentPanel from './AssignmentPanel'
 import { AppShell, Clock3, SeatMap, Stat, mapAssignmentDoc } from './DashboardShared'
 
-export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
+export function AdminDashboard({
+  onLogout,
+  onShowStudents,
+  onShowPayments,
+}: {
+  onLogout: () => void
+  onShowStudents: () => void
+  onShowPayments: () => void
+}) {
   const [shiftId, setShiftId] = useState<Shift['id']>(SHIFTS[0]?.id ?? 'morning')
   const [selectedSeat, setSelectedSeat] = useState('1')
   const [panelOpen, setPanelOpen] = useState(false)
@@ -42,7 +49,6 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [searchError, setSearchError] = useState('')
 
-  // Seat numbers are plain numbers 1–57, matching SEATS[index].seatNo.
   const selectSeat = (raw: string) => {
     const trimmed = raw.trim()
     setSearchError('')
@@ -53,15 +59,13 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
 
     if (!/^\d+$/.test(trimmed)) {
-      setSearchError('Please enter a valid seat number (1–57)')
+      setSearchError('Please enter a valid seat number (1-57)')
       return false
     }
 
     const num = parseInt(trimmed, 10)
     if (num < 1 || num > SEATS.length) {
-      setSearchError(
-        `Seat ${num} does not exist (valid range: 1–${SEATS.length})`,
-      )
+      setSearchError('Seat ' + num + ' does not exist (valid range: 1-' + SEATS.length + ')')
       return false
     }
 
@@ -89,9 +93,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       setAssignments(snapshot.docs.map(mapAssignmentDoc))
     } catch (error) {
       console.error('Failed to load assignments:', error)
-      setLoadError(
-        'Could not load library data. Check your Firestore configuration and rules.',
-      )
+      setLoadError('Could not load library data. Check your Firestore configuration and rules.')
     } finally {
       setLoadingData(false)
     }
@@ -103,15 +105,12 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   }, [])
 
   const occupancy = useMemo(
-    () =>
-      assignments.filter((item) => item.shiftIds?.includes(shiftId) ?? false)
-        .length,
+    () => assignments.filter((item) => item.shiftIds?.includes(shiftId) ?? false).length,
     [assignments, shiftId],
   )
 
   const expiring = useMemo(
-    () =>
-      assignments.filter((item) => getExpiryTone(item.expiryDate) === 'soon'),
+    () => assignments.filter((item) => getExpiryTone(item.expiryDate) === 'soon'),
     [assignments],
   )
 
@@ -142,8 +141,18 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setSaved(true)
   }
 
+  const adminPhoneHref = 'tel:' + ADMIN_CONTACT.phone
+
   return (
-    <AppShell role="admin" greetingName="Admin" onLogout={() => void handleLogout()}>
+    <AppShell
+      role="admin"
+      greetingName="Admin"
+      activeView="overview"
+      onNavigateOverview={() => {}}
+      onNavigateStudents={onShowStudents}
+      onNavigatePayments={onShowPayments}
+      onLogout={() => void handleLogout()}
+    >
       <main className="mx-auto max-w-[1500px] p-6 lg:p-10">
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
@@ -181,7 +190,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') handleSearch()
                 }}
-                placeholder="Search by seat number (1–57)"
+                placeholder="Search by seat number (1-57)"
                 className="h-12 w-full rounded-xl border border-transparent bg-background pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
               />
             </div>
@@ -209,14 +218,14 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             icon={LayoutDashboard}
             label="Total seats"
             value={String(SEATS.length)}
-            detail={`${SHIFTS.length} shifts`}
+            detail={SHIFTS.length + ' shifts'}
           />
 
           <Stat
             icon={Users}
-            label={`Occupied in ${SHIFTS.find((s) => s.id === shiftId)?.name}`}
+            label={'Occupied in ' + (SHIFTS.find((s) => s.id === shiftId)?.name ?? '')}
             value={String(occupancy)}
-            detail={`${Math.round((occupancy / SEATS.length) * 100)}% full`}
+            detail={Math.round((occupancy / SEATS.length) * 100) + '% full'}
           />
 
           <Stat
@@ -230,8 +239,8 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <Stat
             icon={CreditCard}
             label="Outstanding dues"
-            value={`₹${totalDue.toLocaleString('en-IN')}`}
-            detail={`${dues.length} students`}
+            value={'Rs ' + totalDue.toLocaleString('en-IN')}
+            detail={dues.length + ' students'}
             tone="warn"
           />
         </div>
@@ -284,16 +293,14 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
             <div className="mt-5 flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                <strong className="text-foreground">{occupancy}</strong>{' '}
-                occupied ·{' '}
-                <strong className="text-foreground">
-                  {SEATS.length - occupancy}
-                </strong>{' '}
-                vacant in{' '}
+                <strong className="text-foreground">{occupancy}</strong>
+                {' occupied - '}
+                <strong className="text-foreground">{SEATS.length - occupancy}</strong>
+                {' vacant in '}
                 <strong className="text-foreground">
                   {SHIFTS.find((s) => s.id === shiftId)?.name}
-                </strong>{' '}
-                shift
+                </strong>
+                {' shift'}
               </p>
 
               <button
@@ -309,9 +316,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <aside className="flex flex-col gap-6">
             <div className="rounded-2xl border border-border bg-card p-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-serif text-xl font-bold">
-                  Renewals to watch
-                </h2>
+                <h2 className="font-serif text-xl font-bold">Renewals to watch</h2>
 
                 <span className="text-xs font-semibold text-primary">
                   {expiring.length}
@@ -325,10 +330,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </p>
                 ) : (
                   expiring.slice(0, 5).map((item) => (
-                    <div
-                      key={item.id ?? item.billNo}
-                      className="flex items-center gap-3"
-                    >
+                    <div key={item.id ?? item.billNo} className="flex items-center gap-3">
                       <div className="grid size-9 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">
                         {item.studentName
                           .split(' ')
@@ -343,7 +345,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         </p>
 
                         <p className="text-xs text-muted-foreground">
-                          Seat {item.seatNo} · {item.expiryDate}
+                          {'Seat ' + item.seatNo + ' - ' + item.expiryDate}
                         </p>
                       </div>
 
@@ -358,9 +360,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
             <div className="rounded-2xl border border-border bg-card p-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-serif text-xl font-bold">
-                  Outstanding dues
-                </h2>
+                <h2 className="font-serif text-xl font-bold">Outstanding dues</h2>
 
                 <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800">
                   {dues.length} open
@@ -379,17 +379,15 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       className="flex items-center justify-between rounded-xl bg-muted p-3"
                     >
                       <div>
-                        <p className="text-sm font-semibold">
-                          {item.studentName}
-                        </p>
+                        <p className="text-sm font-semibold">{item.studentName}</p>
 
                         <p className="text-xs text-muted-foreground">
-                          Seat {item.seatNo}
+                          {'Seat ' + item.seatNo}
                         </p>
                       </div>
 
                       <strong className="text-sm text-amber-800">
-                        ₹{item.amountDue.toLocaleString('en-IN')}
+                        {'Rs ' + item.amountDue.toLocaleString('en-IN')}
                       </strong>
                     </div>
                   ))
@@ -403,9 +401,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-serif text-xl font-bold">
-                  Shift occupancy
-                </h2>
+                <h2 className="font-serif text-xl font-bold">Shift occupancy</h2>
 
                 <p className="mt-1 text-xs text-muted-foreground">
                   Current utilization across the day
@@ -429,18 +425,13 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
                 return (
                   <div key={shift.id} className="flex items-center gap-4">
-                    <span className="w-20 text-xs font-semibold">
-                      {shift.name}
-                    </span>
+                    <span className="w-20 text-xs font-semibold">{shift.name}</span>
 
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full rounded-full bg-primary"
                         style={{
-                          width: `${Math.min(
-                            (count / SEATS.length) * 100,
-                            100,
-                          )}%`,
+                          width: Math.min((count / SEATS.length) * 100, 100) + '%',
                         }}
                       />
                     </div>
@@ -461,17 +452,14 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   Quick action
                 </p>
 
-                <h2 className="mt-2 font-serif text-2xl font-bold">
-                  Add a student.
-                </h2>
+                <h2 className="mt-2 font-serif text-2xl font-bold">Add a student.</h2>
               </div>
 
               <Plus className="size-5" />
             </div>
 
             <p className="mt-3 max-w-xs text-sm leading-6 text-primary-foreground/75">
-              Assign a vacant seat and save the student's details directly
-              to Firestore.
+              Assign a vacant seat and save the student&apos;s details directly to Firestore.
             </p>
 
             <button
@@ -492,18 +480,16 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <div>
             <div className="flex items-center gap-2">
               <Phone className="size-4 text-primary" />
-              <h2 className="font-serif text-xl font-bold">
-                Library support
-              </h2>
+              <h2 className="font-serif text-xl font-bold">Library support</h2>
             </div>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              {ADMIN_CONTACT.hours} · {ADMIN_CONTACT.email}
+              {ADMIN_CONTACT.hours + ' - ' + ADMIN_CONTACT.email}
             </p>
           </div>
 
           <a
-            href={`tel:${ADMIN_CONTACT.phone}`}
+            href={adminPhoneHref}
             className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground"
           >
             <Phone className="size-4" />
@@ -526,7 +512,6 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         <div className="fixed bottom-6 right-6 flex items-center gap-3 rounded-xl bg-foreground px-4 py-3 text-sm text-background shadow-xl">
           <Check className="size-4 text-primary" />
           Assignment saved to Firestore
-
           <button onClick={() => setSaved(false)} aria-label="Close message">
             <X className="size-4" />
           </button>

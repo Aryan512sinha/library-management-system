@@ -47,6 +47,7 @@ export function mapAssignmentDoc(
     dueStatus: docData.dueStatus || 'paid',
     amountPaid: docData.amountPaid ?? 0,
     amountDue: docData.amountDue ?? 0,
+    paymentMode: docData.paymentMode || undefined,
   } as Assignment
 }
 
@@ -141,15 +142,39 @@ export function SeatMap({
 export function AppShell({
   role,
   greetingName,
+  activeView = 'overview',
+  onNavigateOverview,
+  onNavigateStudents,
+  onNavigatePayments,
   onLogout,
   children,
 }: {
   role: Role
   /** Text shown next to "Good morning," in the topbar, e.g. "Admin" or a student's first name */
   greetingName: string
+  /** Which sidebar item should be highlighted. Defaults to "overview". */
+  activeView?: 'overview' | 'students' | 'payments'
+  /** Called when "Overview" is clicked. Omit to make it inert. */
+  onNavigateOverview?: () => void
+  /** Called when "Students" is clicked (admin only). Omit to make it inert. */
+  onNavigateStudents?: () => void
+  /** Called when "Payments & dues" is clicked (admin only). Omit to make it inert. */
+  onNavigatePayments?: () => void
   onLogout: () => void
   children: React.ReactNode
 }) {
+  // This app has no separate /admin, /students or /student URLs — the root
+  // page swaps dashboards in and out based on login/view state. So sidebar
+  // navigation is done via callbacks (setView(...) in the parent), not
+  // next/link, and "active" is whatever the parent tells us via activeView.
+  const navLinkClasses = (active: boolean) =>
+    cn(
+      'flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition text-left',
+      active
+        ? 'bg-primary/10 font-semibold text-primary'
+        : 'text-muted-foreground hover:bg-muted',
+    )
+
   return (
     <div className="min-h-screen bg-background">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-border bg-card px-5 py-6 lg:flex">
@@ -160,29 +185,44 @@ export function AppShell({
             Workspace
           </p>
 
-          <a className="flex items-center gap-3 rounded-xl bg-primary/10 px-3 py-3 text-sm font-semibold text-primary">
+          <button
+            type="button"
+            onClick={onNavigateOverview}
+            className={navLinkClasses(activeView === 'overview')}
+          >
             <LayoutDashboard className="size-4" />
             Overview
-          </a>
+          </button>
 
           {role === 'admin' && (
             <>
-              <a className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-muted-foreground hover:bg-muted">
+              <button
+                type="button"
+                onClick={onNavigateStudents}
+                className={navLinkClasses(activeView === 'students')}
+              >
                 <Users className="size-4" />
                 Students
-              </a>
+              </button>
 
-              <a className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-muted-foreground hover:bg-muted">
+              <button
+                type="button"
+                onClick={onNavigatePayments}
+                className={navLinkClasses(activeView === 'payments')}
+              >
                 <FileText className="size-4" />
                 Payments & dues
-              </a>
+              </button>
             </>
           )}
 
-          <a className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-muted-foreground hover:bg-muted">
+          <button
+            type="button"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-muted-foreground hover:bg-muted"
+          >
             <Settings className="size-4" />
             Settings
-          </a>
+          </button>
         </nav>
 
         <div className="mt-auto rounded-2xl bg-muted p-4">
