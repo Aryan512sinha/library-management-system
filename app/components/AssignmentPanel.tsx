@@ -34,6 +34,9 @@ export default function AssignmentPanel({
   const [dueStatus, setDueStatus] = useState<'paid' | 'partial' | 'due'>(
     existing?.dueStatus ?? 'paid',
   )
+  const [paymentMode, setPaymentMode] = useState<'cash' | 'online'>(
+    existing?.paymentMode ?? 'cash',
+  )
   const [selectedShifts, setSelectedShifts] = useState<string[]>(
     existing?.shiftIds ?? [shiftId],
   )
@@ -97,6 +100,7 @@ export default function AssignmentPanel({
       amountDue: finalAmountDue,
       amountPaid: finalAmountPaid,
       dueStatus,
+      paymentMode,
     }
 
     try {
@@ -340,6 +344,27 @@ export default function AssignmentPanel({
               <option value="due">Due</option>
             </select>
           </label>
+
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Payment mode
+            <div className="mt-2 flex gap-2">
+              {(['cash', 'online'] as const).map((mode) => (
+                <button
+                  type="button"
+                  key={mode}
+                  onClick={() => setPaymentMode(mode)}
+                  className={cn(
+                    'flex-1 rounded-lg border px-3 py-2 text-sm font-medium normal-case tracking-normal transition',
+                    paymentMode === mode
+                      ? 'border-primary bg-primary/15 text-primary'
+                      : 'border-input bg-background text-muted-foreground hover:bg-muted',
+                  )}
+                >
+                  {mode === 'cash' ? 'Cash' : 'Online'}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {dueStatus === 'paid' && (
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

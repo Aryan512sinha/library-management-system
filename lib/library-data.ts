@@ -53,6 +53,7 @@ export type Assignment = {
   dueStatus: 'paid' | 'partial' | 'due'
   amountPaid: number
   amountDue: number
+  paymentMode?: 'cash' | 'online' // How the amountPaid was collected
 }
 
 export type Shift = (typeof SHIFTS)[number]
