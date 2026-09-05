@@ -5,7 +5,8 @@ import { AlertCircle, Check, Plus, X } from 'lucide-react'
 import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import { SHIFTS, type Assignment } from '@/lib/library-data'
 import { db } from '@/lib/firebase'
-import { cn } from './DashboardShared'
+import { cn } from '@/lib/utils'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 export default function AssignmentPanel({
   seatNo,
@@ -45,14 +46,30 @@ export default function AssignmentPanel({
   const [visible, setVisible] = useState(false)
   const [closing, setClosing] = useState(false)
 
+  const trapRef = useFocusTrap(visible && !closing)
+
   useEffect(() => {
-    setVisible(true)
+    requestAnimationFrame(() => setVisible(true))
+    document.body.classList.add('modal-open')
+    return () => {
+      document.body.classList.remove('modal-open')
+    }
   }, [])
 
-  const handleClose = async () => {
+  useEffect(() => {
+    if (!visible || closing) return
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [visible, closing])
+
+  const handleClose = () => {
     setClosing(true)
-    await new Promise((resolve) => setTimeout(resolve, 200))
-    onClose()
+    setTimeout(() => {
+      onClose()
+    }, 150)
   }
 
   const handleSave = async () => {
@@ -63,12 +80,12 @@ export default function AssignmentPanel({
 
     const cleanMobile = mobileNo.replace(/\D/g, '')
     if (cleanMobile.length !== 10) {
-      setError('Mobile number must be exactly 10 digits')
+      setError('Mobile number must be exactly 10 digits.')
       return
     }
 
     if (selectedShifts.length === 0) {
-      setError('Please select at least one shift')
+      setError('Please select at least one shift.')
       return
     }
 
@@ -111,7 +128,7 @@ export default function AssignmentPanel({
       }
 
       await onSaved()
-      await handleClose()
+      handleClose()
     } catch (saveError) {
       console.error('Failed to save assignment:', saveError)
       setError('Could not save the assignment. Please try again.')
@@ -135,7 +152,7 @@ export default function AssignmentPanel({
     try {
       await deleteDoc(doc(db, 'assignments', existing.id))
       await onSaved()
-      await handleClose()
+      handleClose()
     } catch (deleteError) {
       console.error('Failed to delete assignment:', deleteError)
       setError('Could not remove the assignment.')
@@ -164,14 +181,23 @@ export default function AssignmentPanel({
   const mobileDigits = mobileNo.replace(/\D/g, '')
   const mobileHasError = mobileDigits.length !== 0 && mobileDigits.length !== 10
 
+  const inputClasses = cn(
+    'mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm',
+    'outline-none transition duration-150 focus:border-primary focus:ring-4 focus:ring-primary/10',
+  )
+
   return (
     <div
       className={cn(
-        'fixed inset-0 z-30 flex items-end justify-end bg-foreground/20 backdrop-blur-[2px] sm:items-stretch transition-opacity duration-200',
+        'fixed inset-0 z-30 flex items-end justify-end bg-foreground/20 backdrop-blur-[2px] sm:items-stretch transition-opacity duration-150',
         visible && !closing ? 'opacity-100' : 'opacity-0',
       )}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Assignment panel for seat ${seatNo}`}
     >
       <div
+        ref={trapRef}
         className={cn(
           'flex w-full max-w-lg flex-col overflow-y-auto border-l border-border bg-card p-6 shadow-2xl sm:p-8',
           visible && !closing && 'slide-in',
@@ -194,9 +220,13 @@ export default function AssignmentPanel({
           </div>
 
           <button
-            onClick={() => void handleClose()}
+            onClick={handleClose}
             aria-label="Close panel"
-            className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground"
+            className={cn(
+              'grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground transition duration-150',
+              'hover:bg-destructive/10 hover:text-destructive',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            )}
           >
             <X className="size-4" />
           </button>
@@ -213,6 +243,7 @@ export default function AssignmentPanel({
               'grid size-9 place-items-center rounded-full',
               existing ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground',
             )}
+            aria-hidden="true"
           >
             {existing ? <Check className="size-4" /> : <Plus className="size-4" />}
           </span>
@@ -230,71 +261,78 @@ export default function AssignmentPanel({
         </div>
 
         <div className="mt-8 flex flex-col gap-5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-student-name">
             Student name
-            <input
-              value={studentName}
-              onChange={(event) => setStudentName(event.target.value)}
-              placeholder="Full name"
-              className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
-            />
           </label>
+          <input
+            id="panel-student-name"
+            value={studentName}
+            onChange={(event) => setStudentName(event.target.value)}
+            placeholder="Full name"
+            className={inputClasses}
+          />
 
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-bill-no">
             Bill number
-            <input
-              value={billNo}
-              onChange={(event) => setBillNo(event.target.value)}
-              placeholder="KL-0001"
-              className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
-            />
           </label>
+          <input
+            id="panel-bill-no"
+            value={billNo}
+            onChange={(event) => setBillNo(event.target.value)}
+            placeholder="KL-0001"
+            className={inputClasses}
+          />
 
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-mobile">
             Mobile number
-            <input
-              value={mobileNo}
-              onChange={handleMobileChange}
-              inputMode="numeric"
-              maxLength={10}
-              placeholder="9876543210"
-              className={cn(
-                'mt-2 h-11 w-full rounded-lg border bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary',
-                mobileHasError ? 'border-destructive' : 'border-input',
-              )}
-            />
-            {mobileHasError && (
-              <p className="mt-1 text-xs text-destructive">
-                Mobile number must be exactly 10 digits
-              </p>
-            )}
           </label>
+          <input
+            id="panel-mobile"
+            value={mobileNo}
+            onChange={handleMobileChange}
+            inputMode="numeric"
+            maxLength={10}
+            placeholder="9876543210"
+            className={cn(inputClasses, mobileHasError && 'border-destructive')}
+          />
+          {mobileHasError && (
+            <p className="mt-1 -mt-3 text-xs text-destructive" role="alert">
+              Mobile number must be exactly 10 digits
+            </p>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Admission date
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-admission">
+                Admission date
+              </label>
               <input
+                id="panel-admission"
                 type="date"
                 value={admissionDate}
                 onChange={(event) => setAdmissionDate(event.target.value)}
-                className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+                className={inputClasses}
               />
-            </label>
-
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Expiry date
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-expiry">
+                Expiry date
+              </label>
               <input
+                id="panel-expiry"
                 type="date"
                 value={expiryDate}
                 onChange={(event) => setExpiryDate(event.target.value)}
-                className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+                className={inputClasses}
               />
-            </label>
+            </div>
           </div>
 
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Shift(s)
-            <div className="mt-2 flex flex-wrap gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Shift(s)
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Select shifts">
               {SHIFTS.map((shift) => {
                 const active = selectedShifts.includes(shift.id)
                 return (
@@ -308,53 +346,59 @@ export default function AssignmentPanel({
                           : [...prev, shift.id],
                       )
                     }}
+                    aria-pressed={active}
                     className={cn(
-                      'rounded-lg border px-3 py-2 text-left transition',
+                      'rounded-lg border px-3 py-2 text-left transition duration-150',
+                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                       active
                         ? 'border-primary bg-primary/15 text-primary'
                         : 'border-input bg-background text-muted-foreground hover:bg-muted',
                     )}
                   >
-                    <span className="block text-sm font-medium normal-case tracking-normal">
-                      {shift.name}
-                    </span>
-                    <span className="block text-[11px] normal-case tracking-normal text-muted-foreground">
-                      {shift.time}
-                    </span>
+                    <span className="block text-sm font-medium">{shift.name}</span>
+                    <span className="block text-[11px] text-muted-foreground">{shift.displayTime}</span>
                   </button>
                 )
               })}
             </div>
             {selectedShifts.length === 0 && (
-              <p className="mt-1 text-xs normal-case tracking-normal text-destructive">
+              <p className="mt-1 text-xs text-destructive" role="alert">
                 Please select at least one shift
               </p>
             )}
           </div>
 
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Payment status
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-due-status">
+              Payment status
+            </label>
             <select
+              id="panel-due-status"
               value={dueStatus}
               onChange={(event) => setDueStatus(event.target.value as 'paid' | 'partial' | 'due')}
-              className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+              className={inputClasses}
             >
               <option value="paid">Paid</option>
               <option value="partial">Partial</option>
               <option value="due">Due</option>
             </select>
-          </label>
+          </div>
 
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Payment mode
-            <div className="mt-2 flex gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Payment mode
+            </p>
+            <div className="mt-2 flex gap-2" role="radiogroup" aria-label="Payment mode">
               {(['cash', 'online'] as const).map((mode) => (
                 <button
                   type="button"
                   key={mode}
                   onClick={() => setPaymentMode(mode)}
+                  role="radio"
+                  aria-checked={paymentMode === mode}
                   className={cn(
-                    'flex-1 rounded-lg border px-3 py-2 text-sm font-medium normal-case tracking-normal transition',
+                    'flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition duration-150',
+                    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                     paymentMode === mode
                       ? 'border-primary bg-primary/15 text-primary'
                       : 'border-input bg-background text-muted-foreground hover:bg-muted',
@@ -367,60 +411,71 @@ export default function AssignmentPanel({
           </div>
 
           {dueStatus === 'paid' && (
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Amount paid
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-amount-paid">
+                Amount paid
+              </label>
               <input
+                id="panel-amount-paid"
                 type="number"
                 min="0"
                 value={amountPaid}
                 onChange={handleAmountPaidChange}
-                className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+                className={inputClasses}
               />
-            </label>
+            </div>
           )}
 
           {dueStatus === 'due' && (
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Amount due
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-amount-due">
+                Amount due
+              </label>
               <input
+                id="panel-amount-due"
                 type="number"
                 min="0"
                 value={amountDue}
                 onChange={handleAmountDueChange}
-                className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+                className={inputClasses}
               />
-            </label>
+            </div>
           )}
 
           {dueStatus === 'partial' && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Amount paid
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-amount-paid-partial">
+                  Amount paid
+                </label>
                 <input
+                  id="panel-amount-paid-partial"
                   type="number"
                   min="0"
                   value={amountPaid}
                   onChange={handleAmountPaidChange}
-                  className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+                  className={inputClasses}
                 />
-              </label>
-
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Amount remaining
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-amount-remaining">
+                  Amount remaining
+                </label>
                 <input
+                  id="panel-amount-remaining"
                   type="number"
                   min="0"
                   value={amountDue}
                   onChange={handleAmountDueChange}
-                  className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary"
+                  className={inputClasses}
                 />
-              </label>
+              </div>
             </div>
           )}
 
           {error && (
-            <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-              <AlertCircle className="size-4 shrink-0" />
+            <div className="flex items-center gap-2 rounded-xl bg-danger-subtle px-3 py-2.5 text-sm text-destructive" role="alert">
+              <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
@@ -428,7 +483,12 @@ export default function AssignmentPanel({
           <button
             onClick={() => void handleSave()}
             disabled={saving}
-            className="mt-3 h-12 rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className={cn(
+              'mt-3 h-12 rounded-xl bg-primary text-sm font-semibold text-primary-foreground',
+              'transition duration-150 hover:brightness-110 active:scale-[0.98]',
+              'disabled:cursor-not-allowed disabled:opacity-60',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            )}
           >
             {saving ? 'Saving...' : existing ? 'Update assignment' : 'Save assignment'}
           </button>
@@ -437,7 +497,12 @@ export default function AssignmentPanel({
             <button
               onClick={() => void handleDelete()}
               disabled={saving}
-              className="h-11 rounded-xl border border-destructive/30 text-sm font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-60"
+              className={cn(
+                'h-11 rounded-xl border border-destructive/30 text-sm font-semibold text-destructive',
+                'transition duration-150 hover:bg-destructive/5',
+                'disabled:opacity-60',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+              )}
             >
               Remove assignment
             </button>

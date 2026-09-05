@@ -3,25 +3,29 @@ export const SHIFTS = [
     id: 'morning',
     name: 'Morning',
     time: '6:00 — 10:00',
-    short: '06–10',
+    short: '6 AM – 10 AM',
+    displayTime: '6 AM – 10 AM',
   },
   {
     id: 'midday',
     name: 'Midday',
     time: '10:00 — 14:00',
-    short: '10–14',
+    short: '10 AM – 2 PM',
+    displayTime: '10 AM – 2 PM',
   },
   {
     id: 'afternoon',
     name: 'Afternoon',
     time: '14:00 — 18:00',
-    short: '14–18',
+    short: '2 PM – 6 PM',
+    displayTime: '2 PM – 6 PM',
   },
   {
     id: 'evening',
     name: 'Evening',
     time: '18:00 — 22:00',
-    short: '18–22',
+    short: '6 PM – 10 PM',
+    displayTime: '6 PM – 10 PM',
   },
 ] as const
 
@@ -56,6 +60,8 @@ export type Assignment = {
   paymentMode?: 'cash' | 'online' // How the amountPaid was collected
 }
 
+export type ShiftId = (typeof SHIFTS)[number]['id']
+
 export type Shift = (typeof SHIFTS)[number]
 
 // Admin and student logins are supported
@@ -64,6 +70,17 @@ export type Role = 'admin' | 'student'
 // Application views
 export type ViewMode = 'login' | 'admin' | 'student'
 
+// Attendance record structure used by Firestore
+export type AttendanceRecord = {
+  id?: string
+  date: string       // YYYY-MM-DD
+  shiftId: ShiftId
+  seatNo: string
+  present: boolean
+  markedAt?: number  // Firestore timestamp (ms)
+  markedBy?: string  // optional admin identifier
+}
+
 // Firebase configuration information
 export function getFirebaseSetup() {
   return {
@@ -71,12 +88,6 @@ export function getFirebaseSetup() {
     data: 'Firestore assignments collection',
   }
 }
-
-// 3D library model
-export const MODEL_URL =
-  'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/kl_boox_house_5-VCuxVPe0xoBkmlJZoe5pbrLhEMtaMO.glb'
-
-export const MODEL_LOCAL_URL = '/models/kl_boox_house_5.glb'
 
 // Coordinates for the 57 seats in the 3D/library layout.
 // Still laid out visually in a 6-per-row grid — this is purely for
