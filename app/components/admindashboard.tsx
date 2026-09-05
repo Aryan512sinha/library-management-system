@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Check,
   CreditCard,
-  ExternalLink,
   LayoutDashboard,
   Phone,
   Plus,
@@ -14,8 +13,6 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { signOut } from 'firebase/auth'
-import { collection, getDocs } from 'firebase/firestore'
 import {
   ADMIN_CONTACT,
   SEATS,
@@ -25,25 +22,20 @@ import {
   type Assignment,
   type Shift,
 } from '@/lib/library-data'
-import { auth, db } from '@/lib/firebase'
+import { db } from '@/lib/firebase'
+import { cn } from '@/lib/utils'
+import { getAssignments, getCachedAssignments } from '@/lib/client-data'
 import AssignmentPanel from './AssignmentPanel'
-import { AppShell, Clock3, SeatMap, Stat, mapAssignmentDoc } from './DashboardShared'
+import { Clock3, SeatMap, Stat } from './DashboardShared'
 
-export function AdminDashboard({
-  onLogout,
-  onShowStudents,
-  onShowPayments,
-}: {
-  onLogout: () => void
-  onShowStudents: () => void
-  onShowPayments: () => void
-}) {
+export function AdminDashboard() {
   const [shiftId, setShiftId] = useState<Shift['id']>(SHIFTS[0]?.id ?? 'morning')
   const [selectedSeat, setSelectedSeat] = useState('1')
   const [panelOpen, setPanelOpen] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [loadingData, setLoadingData] = useState(true)
+  const [assignments, setAssignments] = useState<Assignment[]>(() => getCachedAssignments() ?? [])
+  const [loadingData, setLoadingData] = useState(() => getCachedAssignments() === null)
+  const [refreshing, setRefreshing] = useState(false)
   const [loadError, setLoadError] = useState('')
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -86,22 +78,26 @@ export function AdminDashboard({
     }
 
     try {
-      setLoadingData(true)
+      if (getCachedAssignments() === null) {
+        setLoadingData(true)
+      } else {
+        setRefreshing(true)
+      }
       setLoadError('')
 
-      const snapshot = await getDocs(collection(db, 'assignments'))
-      setAssignments(snapshot.docs.map(mapAssignmentDoc))
+      const list = await getAssignments()
+      if (list) setAssignments(list)
     } catch (error) {
       console.error('Failed to load assignments:', error)
       setLoadError('Could not load library data. Check your Firestore configuration and rules.')
     } finally {
       setLoadingData(false)
+      setRefreshing(false)
     }
   }
 
   useEffect(() => {
     void loadAssignments()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const occupancy = useMemo(
@@ -124,18 +120,6 @@ export function AdminDashboard({
     [dues],
   )
 
-  const handleLogout = async () => {
-    try {
-      if (auth) {
-        await signOut(auth)
-      }
-    } catch (error) {
-      console.error('Logout failed:', error)
-    } finally {
-      onLogout()
-    }
-  }
-
   const handleSaved = async () => {
     await loadAssignments()
     setSaved(true)
@@ -144,19 +128,11 @@ export function AdminDashboard({
   const adminPhoneHref = 'tel:' + ADMIN_CONTACT.phone
 
   return (
-    <AppShell
-      role="admin"
-      greetingName="Admin"
-      activeView="overview"
-      onNavigateOverview={() => {}}
-      onNavigateStudents={onShowStudents}
-      onNavigatePayments={onShowPayments}
-      onLogout={() => void handleLogout()}
-    >
-      <main className="mx-auto max-w-[1500px] p-6 lg:p-10">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+    <>
+    <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-10">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <h1 className="mt-3 font-serif text-4xl font-bold tracking-tight">
+            <h1 className="mt-3 font-serif text-3xl font-bold tracking-tight sm:text-4xl">
               Library overview
             </h1>
 
@@ -165,14 +141,18 @@ export function AdminDashboard({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-1">
-            <span className="px-3 py-2 text-xs font-semibold text-muted-foreground">
-              {loadingData ? 'Loading...' : 'Live Firestore data'}
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1.5">
+            <span className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+              {refreshing ? 'Syncing...' : loadingData ? 'Loading...' : 'Live Firestore data'}
             </span>
 
             <button
               onClick={() => void loadAssignments()}
-              className="rounded-lg bg-muted px-3 py-2 text-xs font-semibold"
+              className={cn(
+                'rounded-lg bg-muted px-3 py-2 text-xs font-semibold transition duration-150',
+                'hover:bg-primary/10',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+              )}
             >
               Refresh
             </button>
@@ -182,7 +162,7 @@ export function AdminDashboard({
         <div className="mt-6">
           <div className="relative flex w-full items-center gap-2 rounded-2xl border border-border bg-card p-3">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <input
                 type="text"
                 value={searchTerm}
@@ -191,62 +171,74 @@ export function AdminDashboard({
                   if (event.key === 'Enter') handleSearch()
                 }}
                 placeholder="Search by seat number (1-57)"
-                className="h-12 w-full rounded-xl border border-transparent bg-background pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+                aria-label="Search by seat number"
+                className="h-12 w-full rounded-xl border border-transparent bg-background pl-10 pr-3 text-sm outline-none transition duration-150 focus:border-primary focus:ring-4 focus:ring-primary/10"
               />
             </div>
             <button
               onClick={handleSearch}
-              className="h-12 shrink-0 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              className={cn(
+                'h-12 shrink-0 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground',
+                'transition duration-150 hover:brightness-110 active:scale-[0.98]',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+              )}
             >
               Search
             </button>
           </div>
           {searchError && (
-            <p className="mt-2 text-xs text-destructive">{searchError}</p>
+            <p className="mt-2 text-xs text-destructive" role="alert">{searchError}</p>
           )}
         </div>
 
         {loadError && (
-          <div className="mt-6 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            <AlertCircle className="size-4 shrink-0" />
+          <div className="mt-6 flex items-center gap-2 rounded-xl bg-danger-subtle px-4 py-3 text-sm text-destructive" role="alert">
+            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
             {loadError}
           </div>
         )}
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat
-            icon={LayoutDashboard}
-            label="Total seats"
-            value={String(SEATS.length)}
-            detail={SHIFTS.length + ' shifts'}
-          />
-
-          <Stat
-            icon={Users}
-            label={'Occupied in ' + (SHIFTS.find((s) => s.id === shiftId)?.name ?? '')}
-            value={String(occupancy)}
-            detail={Math.round((occupancy / SEATS.length) * 100) + '% full'}
-          />
-
-          <Stat
-            icon={Clock3}
-            label="Renewals to watch"
-            value={String(expiring.length).padStart(2, '0')}
-            detail="Needs action"
-            tone="warn"
-          />
-
-          <Stat
-            icon={CreditCard}
-            label="Outstanding dues"
-            value={'Rs ' + totalDue.toLocaleString('en-IN')}
-            detail={dues.length + ' students'}
-            tone="warn"
-          />
+        {/* Stats */}
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" role="list" aria-label="Library statistics">
+          <div role="listitem">
+            <Stat
+              icon={LayoutDashboard}
+              label="Total seats"
+              value={String(SEATS.length)}
+              detail={SHIFTS.length + ' shifts'}
+            />
+          </div>
+          <div role="listitem">
+            <Stat
+              icon={Users}
+              label={'Occupied in ' + (SHIFTS.find((s) => s.id === shiftId)?.name ?? '')}
+              value={String(occupancy)}
+              detail={Math.round((occupancy / SEATS.length) * 100) + '% full'}
+            />
+          </div>
+          <div role="listitem">
+            <Stat
+              icon={Clock3}
+              label="Renewals to watch"
+              value={String(expiring.length).padStart(2, '0')}
+              detail="Needs action"
+              tone="warn"
+            />
+          </div>
+          <div role="listitem">
+            <Stat
+              icon={CreditCard}
+              label="Outstanding dues"
+              value={'Rs ' + totalDue.toLocaleString('en-IN')}
+              detail={dues.length + ' students'}
+              tone="warn"
+            />
+          </div>
         </div>
 
+        {/* Seat map + sidebar */}
         <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="min-w-0 rounded-2xl border border-border bg-card p-5 lg:p-6">
+          <section className="min-w-0 rounded-2xl border border-border bg-card p-5 lg:p-6" aria-label="Seat map">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
               <div>
                 <div className="flex items-center gap-2">
@@ -262,19 +254,24 @@ export function AdminDashboard({
                 </p>
               </div>
 
-              <div className="flex gap-1 rounded-xl bg-muted p-1">
+              <div className="flex gap-1 rounded-xl bg-muted p-1" role="tablist" aria-label="Shift selector">
                 {SHIFTS.map((shift) => (
                   <button
                     key={shift.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={shiftId === shift.id}
                     onClick={() => {
                       setShiftId(shift.id)
                       setSelectedSeat('1')
                     }}
-                    className={
+                    className={cn(
+                      'rounded-lg px-3 py-2 text-xs font-semibold transition duration-150',
+                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                       shiftId === shift.id
-                        ? 'rounded-lg bg-card px-3 py-2 text-xs font-semibold text-primary shadow-sm transition'
-                        : 'rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground'
-                    }
+                        ? 'bg-card text-primary shadow-sm tab-active'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
                   >
                     <span className="hidden sm:inline">{shift.name}</span>
                     <span className="sm:hidden">{shift.short}</span>
@@ -291,7 +288,7 @@ export function AdminDashboard({
               />
             </div>
 
-            <div className="mt-5 flex items-center justify-between">
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-muted-foreground">
                 <strong className="text-foreground">{occupancy}</strong>
                 {' occupied - '}
@@ -305,10 +302,14 @@ export function AdminDashboard({
 
               <button
                 onClick={() => setPanelOpen(true)}
-                className="flex items-center gap-2 text-xs font-semibold text-primary"
+                className={cn(
+                  'flex items-center gap-2 text-xs font-semibold text-primary',
+                  'transition duration-150 hover:underline',
+                  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                )}
               >
                 View selected seat
-                <ArrowRight className="size-3" />
+                <ArrowRight className="size-3" aria-hidden="true" />
               </button>
             </div>
           </section>
@@ -318,7 +319,7 @@ export function AdminDashboard({
               <div className="flex items-center justify-between">
                 <h2 className="font-serif text-xl font-bold">Renewals to watch</h2>
 
-                <span className="text-xs font-semibold text-primary">
+                <span className="rounded-full bg-warning-subtle px-2 py-1 text-[10px] font-bold text-warning-foreground" aria-label={`${expiring.length} renewals`}>
                   {expiring.length}
                 </span>
               </div>
@@ -331,7 +332,7 @@ export function AdminDashboard({
                 ) : (
                   expiring.slice(0, 5).map((item) => (
                     <div key={item.id ?? item.billNo} className="flex items-center gap-3">
-                      <div className="grid size-9 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">
+                      <div className="grid size-9 shrink-0 place-items-center rounded-full bg-warning-subtle text-xs font-bold text-warning-foreground" aria-hidden="true">
                         {item.studentName
                           .split(' ')
                           .map((name) => name[0])
@@ -345,13 +346,9 @@ export function AdminDashboard({
                         </p>
 
                         <p className="text-xs text-muted-foreground">
-                          {'Seat ' + item.seatNo + ' - ' + item.expiryDate}
+                          {'Seat ' + item.seatNo + ' — ' + getExpiryLabel(item.expiryDate)}
                         </p>
                       </div>
-
-                      <span className="text-xs font-bold text-amber-700">
-                        {getExpiryLabel(item.expiryDate)}
-                      </span>
                     </div>
                   ))
                 )}
@@ -362,7 +359,7 @@ export function AdminDashboard({
               <div className="flex items-center justify-between">
                 <h2 className="font-serif text-xl font-bold">Outstanding dues</h2>
 
-                <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800">
+                <span className="rounded-full bg-warning-subtle px-2 py-1 text-[10px] font-bold text-warning-foreground" aria-label={`${dues.length} students with dues`}>
                   {dues.length} open
                 </span>
               </div>
@@ -386,7 +383,7 @@ export function AdminDashboard({
                         </p>
                       </div>
 
-                      <strong className="text-sm text-amber-800">
+                      <strong className="text-sm text-warning-foreground">
                         {'Rs ' + item.amountDue.toLocaleString('en-IN')}
                       </strong>
                     </div>
@@ -397,6 +394,7 @@ export function AdminDashboard({
           </aside>
         </div>
 
+        {/* Shift occupancy + Quick action */}
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="flex items-center justify-between">
@@ -407,14 +405,6 @@ export function AdminDashboard({
                   Current utilization across the day
                 </p>
               </div>
-
-              <button
-                onClick={() => void loadAssignments()}
-                className="grid size-9 place-items-center rounded-lg bg-muted"
-                aria-label="Refresh occupancy"
-              >
-                <ExternalLink className="size-4" />
-              </button>
             </div>
 
             <div className="mt-6 flex flex-col gap-4">
@@ -427,9 +417,16 @@ export function AdminDashboard({
                   <div key={shift.id} className="flex items-center gap-4">
                     <span className="w-20 text-xs font-semibold">{shift.name}</span>
 
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-2 flex-1 overflow-hidden rounded-full bg-muted"
+                      role="progressbar"
+                      aria-valuenow={count}
+                      aria-valuemin={0}
+                      aria-valuemax={SEATS.length}
+                      aria-label={`${shift.name} occupancy: ${count} of ${SEATS.length}`}
+                    >
                       <div
-                        className="h-full rounded-full bg-primary"
+                        className="h-full rounded-full bg-primary transition-all duration-300"
                         style={{
                           width: Math.min((count / SEATS.length) * 100, 100) + '%',
                         }}
@@ -455,7 +452,7 @@ export function AdminDashboard({
                 <h2 className="mt-2 font-serif text-2xl font-bold">Add a student.</h2>
               </div>
 
-              <Plus className="size-5" />
+              <Plus className="size-5" aria-hidden="true" />
             </div>
 
             <p className="mt-3 max-w-xs text-sm leading-6 text-primary-foreground/75">
@@ -468,35 +465,44 @@ export function AdminDashboard({
                 setShiftId(SHIFTS[0]?.id ?? 'morning')
                 setPanelOpen(true)
               }}
-              className="mt-6 flex items-center gap-2 rounded-xl bg-card px-4 py-3 text-xs font-bold text-primary"
+              className={cn(
+                'mt-6 flex items-center gap-2 rounded-xl bg-card px-4 py-3 text-xs font-bold text-primary',
+                'transition duration-150 hover:brightness-95 active:scale-[0.98]',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+              )}
             >
               Assign a seat
-              <ArrowRight className="size-4" />
+              <ArrowRight className="size-4" aria-hidden="true" />
             </button>
           </div>
         </div>
 
+        {/* Library support */}
         <div className="mt-6 flex flex-col justify-between gap-5 rounded-2xl border border-border bg-card p-6 sm:flex-row sm:items-center">
           <div>
             <div className="flex items-center gap-2">
-              <Phone className="size-4 text-primary" />
+              <Phone className="size-4 text-primary" aria-hidden="true" />
               <h2 className="font-serif text-xl font-bold">Library support</h2>
             </div>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              {ADMIN_CONTACT.hours + ' - ' + ADMIN_CONTACT.email}
+              {ADMIN_CONTACT.hours} — {ADMIN_CONTACT.email}
             </p>
           </div>
 
           <a
             href={adminPhoneHref}
-            className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground"
+            className={cn(
+              'flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground',
+              'transition duration-150 hover:brightness-110 active:scale-[0.98]',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            )}
           >
-            <Phone className="size-4" />
+            <Phone className="size-4" aria-hidden="true" />
             {ADMIN_CONTACT.phone}
           </a>
         </div>
-      </main>
+      </div>
 
       {panelOpen && (
         <AssignmentPanel
@@ -509,14 +515,22 @@ export function AdminDashboard({
       )}
 
       {saved && (
-        <div className="fixed bottom-6 right-6 flex items-center gap-3 rounded-xl bg-foreground px-4 py-3 text-sm text-background shadow-xl">
-          <Check className="size-4 text-primary" />
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 flex items-center gap-3 rounded-xl bg-foreground px-4 py-3 text-sm text-background shadow-xl fade-in"
+        >
+          <Check className="size-4 text-success" aria-hidden="true" />
           Assignment saved to Firestore
-          <button onClick={() => setSaved(false)} aria-label="Close message">
+          <button
+            onClick={() => setSaved(false)}
+            aria-label="Dismiss notification"
+            className="ml-1 hover:opacity-70 transition duration-150"
+          >
             <X className="size-4" />
           </button>
         </div>
       )}
-    </AppShell>
+    </>
   )
 }

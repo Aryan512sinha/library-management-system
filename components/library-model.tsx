@@ -5,7 +5,6 @@ import { Canvas, useThree } from '@react-three/fiber'
 import { Environment, OrbitControls, useGLTF } from '@react-three/drei'
 import { Box3, Group, Vector3 } from 'three'
 
-// onSelect now receives the seat identifier (string) when a specific seat/mesh is clicked
 function LibraryModel({ onSelect }: { onSelect: (seat: string) => void }) {
   const { scene } = useGLTF('/models/kl_boox_house6.glb')
   const modelRef = useRef<Group>(null)
@@ -28,21 +27,23 @@ function LibraryModel({ onSelect }: { onSelect: (seat: string) => void }) {
     camera.updateProjectionMatrix()
   }, [camera, cloned])
 
-  // The click event bubbles up from the specific mesh that was clicked.
-  // We inspect event.object.name (or event.object.userData) to determine which seat was clicked
-  // and pass that identifier to the onSelect callback. Using `any` for the event keeps types simple.
   return (
     <group
       ref={modelRef}
-      onClick={(event: any) => {
-        event.stopPropagation()
-        // Try to read a seat identifier from the clicked object.
-        // Many glTF models include meaningful `name` values on meshes; some projects store data in userData.
-        const clicked = event?.object
-        const seatId = clicked?.userData?.seatNo || clicked?.name || ''
-        onSelect(seatId)
+      onClick={(event: { object: { name?: string; parent?: { name?: string; parent?: { name?: string; parent?: { name?: string; parent?: { name?: string } } } } } }) => {
+        let current: { name?: string; parent?: typeof current } | undefined = event?.object
+        let seatId = ''
+        while (current) {
+          const name: string = current.name || ''
+          const match = name.match(/^seat_(\d+)$/)
+          if (match) {
+            seatId = match[1]
+            break
+          }
+          current = current.parent
+        }
+        if (seatId) onSelect(seatId)
       }}
-      onPointerDown={(event: any) => event.stopPropagation()}
     >
       <primitive object={cloned} />
     </group>
@@ -62,14 +63,39 @@ function ModelScene({ onSelect }: { onSelect: (seat: string) => void }) {
   </>
 }
 
-export function LibraryModelView({ onSelect }: { onSelect: (seat: string) => void }) {
-  return <div className="relative h-[520px] overflow-hidden rounded-2xl border border-border bg-muted shadow-inner sm:h-[620px]">
-    <div className="pointer-events-none absolute left-5 top-5 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Full building</div>
-    <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground">Drag to rotate · Scroll to zoom · Double-click to center</div>
-    <Canvas camera={{ position: [12, 9, 14], fov: 50 }} dpr={[1, 1.5]} shadows onCreated={({ camera }) => { camera.far = 10000; camera.updateProjectionMatrix() }}>
-      <ModelScene onSelect={onSelect} />
-    </Canvas>
-  </div>
+function ModelFallback() {
+  return (
+    <div className="flex h-full items-center justify-center bg-muted rounded-2xl">
+      <div className="text-center">
+        <div className="mx-auto size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <p className="mt-3 text-xs text-muted-foreground">Loading 3D model...</p>
+      </div>
+    </div>
+  )
 }
 
-useGLTF.preload('/models/kl_boox_house6.glb')
+export function LibraryModelView({ onSelect }: { onSelect: (seat: string) => void }) {
+  return (
+    <div className="relative h-[300px] overflow-hidden rounded-2xl border border-border bg-muted shadow-inner sm:h-[400px] lg:h-[520px] xl:h-[620px]">
+      <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground sm:left-5 sm:top-5">
+        Full building
+      </div>
+      <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-[10px] text-muted-foreground sm:bottom-5 sm:left-5 sm:text-xs">
+        Drag to rotate &middot; Scroll to zoom &middot; Double-click to center
+      </div>
+      <Suspense fallback={<ModelFallback />}>
+        <Canvas
+          camera={{ position: [12, 9, 14], fov: 50 }}
+          dpr={[1, 1.2]}
+          shadows
+          onCreated={({ camera }) => {
+            camera.far = 10000
+            camera.updateProjectionMatrix()
+          }}
+        >
+          <ModelScene onSelect={onSelect} />
+        </Canvas>
+      </Suspense>
+    </div>
+  )
+}
