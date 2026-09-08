@@ -62,6 +62,11 @@ function shiftDateDocId(date: string, shiftId: string, seatNo: string): string {
   return `${date}_${shiftId}_${seatNo}`
 }
 
+// Composite key so the same seat can hold different students across shifts.
+function seatShiftKey(seatNo: string, shiftId: string): string {
+  return `${seatNo}_${shiftId}`
+}
+
 // ---------------------------------------------------------------------------
 // Individual seat cell — memoized to prevent 57-seat re-renders
 // ---------------------------------------------------------------------------
@@ -287,10 +292,18 @@ export default function LiveAttendancePage() {
     [attendanceMap, selectedDate, activeShift, togglingSeat],
   )
 
+  // Keyed by `${seatNo}_${shiftId}` so a seat can hold a different student
+  // in each shift (e.g. vinita in Midday, hemlata in Afternoon on seat 2)
+  // instead of one shift's assignment silently overwriting another's.
+  // Each assignment can cover multiple shifts (Assignment.shiftIds is an
+  // array — one student/bill can span more than one shift on the same
+  // seat), so fan the assignment out under every shiftId it lists.
   const assignmentBySeat = useMemo(() => {
     const map: Record<string, Assignment> = {}
     for (const a of assignments) {
-      map[a.seatNo] = a
+      for (const shiftId of a.shiftIds) {
+        map[seatShiftKey(a.seatNo, shiftId)] = a
+      }
     }
     return map
   }, [assignments])
@@ -485,7 +498,7 @@ export default function LiveAttendancePage() {
           >
             {SEATS.map((seat) => {
               const present = attendanceMap[seat.seatNo] ?? false
-              const assignment = assignmentBySeat[seat.seatNo]
+              const assignment = assignmentBySeat[seatShiftKey(seat.seatNo, activeShift)]
 
               return (
                 <SeatCell
