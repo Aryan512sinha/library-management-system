@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { AlertCircle, ArrowRight, Clock3, ShieldCheck, Users } from 'lucide-react'
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import type { Assignment, Role } from '@/lib/library-data'
 import { auth, db } from '@/lib/firebase'
@@ -25,9 +25,21 @@ export function Login({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const isValidEmail = (value: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(value)
+  }
+
   const handleAdminLogin = async () => {
-    if (!email.trim() || !password) {
+    const trimmedEmail = email.trim()
+
+    if (!trimmedEmail || !password) {
       setError('Please enter your admin email and password.')
+      return
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Please enter a valid email address.')
       return
     }
 
@@ -40,11 +52,18 @@ export function Login({
     setError('')
 
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password)
+      await signInWithEmailAndPassword(auth, trimmedEmail, password)
       onLogin('admin')
-    } catch (err) {
+    } catch (err: any) {
       console.error('Admin login failed:', err)
-      setError('Invalid admin email or password.')
+
+      if (err?.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.')
+      } else if (err?.code === 'auth/invalid-credential') {
+        setError('Invalid admin email or password.')
+      } else {
+        setError('Invalid admin email or password.')
+      }
     } finally {
       setLoading(false)
     }
@@ -79,6 +98,15 @@ export function Login({
       }
 
       const matchedAssignment = mapAssignmentDoc(snapshot.docs[0])
+
+      if (auth) {
+        try {
+          await signInAnonymously(auth)
+        } catch (anonError) {
+          console.error('Anonymous sign-in failed:', anonError)
+        }
+      }
+
       onLogin('student', matchedAssignment)
     } catch (err) {
       console.error('Student login failed:', err)

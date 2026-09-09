@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { AlertCircle, CreditCard, LayoutDashboard, Phone, Users } from 'lucide-react'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { ADMIN_CONTACT, SHIFTS, getExpiryLabel, type Assignment } from '@/lib/library-data'
+import { formatDate } from '@/lib/date-utils'
 import { db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { mapAssignmentDoc } from '@/lib/client-data'
@@ -101,7 +102,7 @@ export function StudentDashboard({
             <Stat icon={LayoutDashboard} label="Your seat" value={record.seatNo || '\u2014'} detail={record.shiftIds?.join(', ') || '\u2014'} />
           </div>
           <div role="listitem">
-            <Stat icon={Clock3} label="Valid until" value={record.expiryDate || '\u2014'} detail={getExpiryLabel(record.expiryDate)} />
+            <Stat icon={Clock3} label="Valid until" value={formatDate(record.expiryDate) || '\u2014'} detail={getExpiryLabel(record.expiryDate)} />
           </div>
           <div role="listitem">
             <Stat
@@ -176,7 +177,7 @@ export function StudentDashboard({
 
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Valid until</dt>
-                <dd className="font-semibold">{record.expiryDate || '\u2014'}</dd>
+                <dd className="font-semibold">{formatDate(record.expiryDate) || '\u2014'}</dd>
               </div>
             </dl>
           </aside>

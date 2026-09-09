@@ -16,6 +16,7 @@ import {
   FileText,
 } from 'lucide-react'
 import type { Assignment, Role } from '@/lib/library-data'
+import type { AdminProfile } from '@/lib/admin-profile'
 import { LibraryModelView } from '@/components/library-model'
 import { cn } from '@/lib/utils'
 import { mapAssignmentDoc } from '@/lib/client-data'
@@ -69,7 +70,7 @@ export function Stat({
   tone?: string
 }) {
   return (
-    <div className="card-surface rounded-2xl border border-border bg-card p-5">
+    <div className="stat-card card-surface rounded-2xl border border-border bg-card p-5">
       <div className="flex items-start justify-between">
         <div className="grid size-9 place-items-center rounded-xl bg-muted text-primary">
           <Icon className="size-4" aria-hidden="true" />
@@ -171,7 +172,7 @@ function MobileDrawer({
           <button
             onClick={onClose}
             aria-label="Close menu"
-            className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="grid size-9 place-items-center rounded-lg text-muted-foreground icon-button focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             <X className="size-5" />
           </button>
@@ -196,166 +197,161 @@ function MobileDrawer({
 function ProfileMenu({
   role,
   greetingName,
+  adminProfile,
   onProfile,
   onSettings,
   onLogout,
+  open,
+  onOpenChange,
 }: {
   role: Role
   greetingName: string
+  adminProfile?: AdminProfile
   onProfile?: () => void
   onSettings?: () => void
   onLogout: () => void
+  open?: boolean
+  onOpenChange?: (value: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const [closing, setClosing] = useState(false)
+  const isControlled = open !== undefined && onOpenChange !== undefined
+  const [internalOpen, setInternalOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const firstItemRef = useRef<HTMLButtonElement>(null)
 
+  const isOpen = isControlled ? open : internalOpen
+
   const closeMenu = useCallback(() => {
-    setClosing(true)
-    setTimeout(() => {
-      setOpen(false)
-      setClosing(false)
-    }, 100)
-  }, [])
+    if (isControlled) {
+      onOpenChange(false)
+    } else {
+      setInternalOpen(false)
+    }
+  }, [isControlled, onOpenChange])
+
+  const toggleMenu = useCallback(() => {
+    if (isControlled) {
+      onOpenChange(!open)
+    } else {
+      setInternalOpen((prev) => !prev)
+    }
+  }, [isControlled, onOpenChange, open])
 
   // Focus management: move into menu on open, restore to trigger on close
   useEffect(() => {
-    if (open) {
+    if (isOpen) {
       requestAnimationFrame(() => firstItemRef.current?.focus())
-    } else {
-      setClosing(false)
     }
-  }, [open])
+  }, [isOpen])
 
-  useEffect(() => {
-    if (!open) return
-    const handleOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        closeMenu()
-      }
-    }
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeMenu()
-        triggerRef.current?.focus()
-      }
-    }
-    const handleTab = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !menuRef.current) return
-      const items = menuRef.current.querySelectorAll<HTMLElement>('[role="menuitem"]')
-      if (items.length === 0) return
-      const first = items[0]
-      const last = items[items.length - 1]
-      const focusable = menuRef.current.contains(document.activeElement)
-      if (!focusable && !e.shiftKey) {
-        e.preventDefault()
-        first.focus()
-        return
-      }
-      if (e.shiftKey && focusable && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-        return
-      }
-      if (!e.shiftKey && focusable && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('mousedown', handleOutside)
-    document.addEventListener('keydown', handleEscape)
-    document.addEventListener('keydown', handleTab)
-    return () => {
-      document.removeEventListener('mousedown', handleOutside)
-      document.removeEventListener('keydown', handleEscape)
-      document.removeEventListener('keydown', handleTab)
-    }
-  }, [open, closeMenu])
+  const menuContent = (
+    <>
+      <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+        {adminProfile?.photoURL ? (
+          <img
+            src={adminProfile.photoURL}
+            alt={greetingName}
+            className="size-10 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+            {greetingName.slice(0, 2).toUpperCase()}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{greetingName}</p>
+          <p className="text-xs text-muted-foreground">
+            {role === 'admin' ? 'Administrator' : 'Member'}
+          </p>
+        </div>
+      </div>
+
+      <div className="my-1 h-px bg-border" />
+
+      {onProfile && (
+        <button
+          ref={firstItemRef}
+          role="menuitem"
+          onClick={() => { closeMenu(); onProfile() }}
+          className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 text-sm text-foreground menu-item"
+        >
+          <User className="size-4 text-muted-foreground" aria-hidden="true" />
+          Profile
+        </button>
+      )}
+
+      {onSettings && (
+        <button
+          role="menuitem"
+          onClick={() => { closeMenu(); onSettings() }}
+          className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 text-sm text-foreground menu-item"
+        >
+          <Settings className="size-4 text-muted-foreground" aria-hidden="true" />
+          Settings
+        </button>
+      )}
+
+      <div className="my-1 h-px bg-border" />
+
+      <button
+        role="menuitem"
+        onClick={() => { closeMenu(); onLogout() }}
+        className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 text-sm text-foreground menu-item-danger"
+      >
+        <LogOut className="size-4 text-muted-foreground" aria-hidden="true" />
+        Sign out
+      </button>
+    </>
+  )
 
   return (
     <div className="relative" ref={menuRef}>
       <button
         ref={triggerRef}
-        onClick={() => (open ? closeMenu() : setOpen(true))}
+        onClick={toggleMenu}
         aria-haspopup="menu"
-        aria-expanded={open}
+        aria-expanded={isOpen}
         aria-label="Open profile menu"
         className={cn(
           'flex h-10 items-center gap-1.5 rounded-xl px-1.5 transition duration-150',
           'hover:bg-muted',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+          'avatar-hover',
         )}
       >
-        <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
-          {greetingName.slice(0, 2).toUpperCase()}
-        </div>
+        {adminProfile?.photoURL ? (
+          <img
+            src={adminProfile.photoURL}
+            alt={greetingName}
+            className="size-10 rounded-xl object-cover"
+          />
+        ) : (
+          <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
+            {greetingName.slice(0, 2).toUpperCase()}
+          </div>
+        )}
         <ChevronDown
           className={cn(
             'size-4 text-muted-foreground transition-transform duration-150',
-            open && 'rotate-180',
+            isOpen && 'rotate-180',
           )}
           aria-hidden="true"
         />
       </button>
 
-      {open && (
+      {/* Mobile inline menu - rendered by AppShell outside header */}
+
+      {/* Desktop dropdown */}
+      {isOpen && (
         <div
           role="menu"
           aria-label="Profile options"
           className={cn(
-            'absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-lg shadow-primary/5',
-            closing ? 'modal-exit' : 'menu-enter',
+            'absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-lg shadow-primary/5 menu-panel',
+            'menu-enter hidden lg:block',
           )}
         >
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
-            <div className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-              {greetingName.slice(0, 2).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{greetingName}</p>
-              <p className="text-xs text-muted-foreground">
-                {role === 'admin' ? 'Administrator' : 'Member'}
-              </p>
-            </div>
-          </div>
-
-          <div className="my-1 h-px bg-border" />
-
-          {onProfile && (
-            <button
-              ref={firstItemRef}
-              role="menuitem"
-              onClick={() => { closeMenu(); onProfile() }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-foreground transition duration-150 hover:bg-muted"
-            >
-              <User className="size-4 text-muted-foreground" aria-hidden="true" />
-              Profile
-            </button>
-          )}
-
-          {onSettings && (
-            <button
-              role="menuitem"
-              onClick={() => { closeMenu(); onSettings() }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-foreground transition duration-150 hover:bg-muted"
-            >
-              <Settings className="size-4 text-muted-foreground" aria-hidden="true" />
-              Settings
-            </button>
-          )}
-
-          <div className="my-1 h-px bg-border" />
-
-          <button
-            role="menuitem"
-            onClick={() => { closeMenu(); onLogout() }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-foreground transition duration-150 hover:bg-muted hover:text-destructive"
-          >
-            <LogOut className="size-4 text-muted-foreground" aria-hidden="true" />
-            Sign out
-          </button>
+          {menuContent}
         </div>
       )}
     </div>
@@ -376,6 +372,7 @@ export function AppShell({
   onNavigatePayments,
   onNavigateSettings,
   onLogout,
+  adminProfile,
   children,
 }: {
   role: Role
@@ -387,9 +384,12 @@ export function AppShell({
   onNavigatePayments?: () => void
   onNavigateSettings?: () => void
   onLogout: () => void
+  adminProfile?: AdminProfile
   children: React.ReactNode
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
 
@@ -403,13 +403,40 @@ export function AppShell({
     return () => document.body.classList.remove('modal-open')
   }, [drawerOpen])
 
+  // Close mobile admin menu on outside click or Escape
+  useEffect(() => {
+    if (!adminMenuOpen) return
+
+    const handleOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      const menuEl = mobileMenuRef.current
+      const triggerEl = document.querySelector('[aria-haspopup="menu"][aria-expanded="true"]')
+      if (menuEl && !menuEl.contains(target) && (!triggerEl || !triggerEl.contains(target))) {
+        setAdminMenuOpen(false)
+      }
+    }
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setAdminMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [adminMenuOpen])
+
   const navLinkClasses = (active: boolean) =>
     cn(
-      'flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition text-left',
+      'flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-left sidebar-link',
       'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
       active
         ? 'bg-primary/10 font-semibold text-primary'
-        : 'text-muted-foreground hover:bg-muted',
+        : 'text-muted-foreground',
     )
 
   const navItems = (
@@ -478,7 +505,7 @@ export function AppShell({
     <>
       <button
         onClick={() => { onLogout(); closeDrawer() }}
-        className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:text-foreground sidebar-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <LogOut className="size-4" aria-hidden="true" />
         Sign out
@@ -513,12 +540,12 @@ export function AppShell({
       />
 
       <div className="lg:pl-64">
-        <header className="flex h-16 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-sm sm:h-20 sm:px-6 lg:px-10" role="banner">
+        <header className="header-bar flex h-16 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-sm sm:h-20 sm:px-6 lg:px-10" role="banner">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setDrawerOpen(true)}
               aria-label="Open menu"
-              className="grid size-10 place-items-center rounded-xl border border-border text-muted-foreground hover:bg-muted lg:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="grid size-10 place-items-center rounded-xl border border-border text-muted-foreground icon-button lg:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               <Menu className="size-5" />
             </button>
@@ -540,12 +567,85 @@ export function AppShell({
             <ProfileMenu
               role={role}
               greetingName={greetingName}
+              adminProfile={adminProfile}
               onProfile={onNavigateSettings}
               onSettings={onNavigateSettings}
               onLogout={onLogout}
+              open={adminMenuOpen}
+              onOpenChange={setAdminMenuOpen}
             />
           </div>
         </header>
+
+        {/* Mobile admin inline menu — pushes main content down */}
+        <div
+          ref={mobileMenuRef}
+          className={cn(
+            'lg:hidden overflow-hidden transition-all duration-200 ease-out',
+            adminMenuOpen ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0',
+          )}
+        >
+          <div className="mx-4 sm:mx-6">
+            <div
+              role="menu"
+              aria-label="Profile options"
+              className="menu-panel rounded-xl border border-border bg-card p-1.5 shadow-sm"
+            >
+              <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+                {adminProfile?.photoURL ? (
+                  <img
+                    src={adminProfile.photoURL}
+                    alt={greetingName}
+                    className="size-10 shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                    {greetingName.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{greetingName}</p>
+                  <p className="text-xs text-muted-foreground">Administrator</p>
+                </div>
+              </div>
+
+              <div className="my-1 h-px bg-border" />
+
+              {onNavigateSettings && (
+                <button
+                  role="menuitem"
+                  onClick={() => { setAdminMenuOpen(false); onNavigateSettings() }}
+                  className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 text-sm text-foreground menu-item"
+                >
+                  <User className="size-4 text-muted-foreground" aria-hidden="true" />
+                  Profile
+                </button>
+              )}
+
+              {onNavigateSettings && (
+                <button
+                  role="menuitem"
+                  onClick={() => { setAdminMenuOpen(false); onNavigateSettings() }}
+                  className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 text-sm text-foreground menu-item"
+                >
+                  <Settings className="size-4 text-muted-foreground" aria-hidden="true" />
+                  Settings
+                </button>
+              )}
+
+              <div className="my-1 h-px bg-border" />
+
+              <button
+                role="menuitem"
+                onClick={() => { setAdminMenuOpen(false); onLogout() }}
+                className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 text-sm text-foreground menu-item-danger"
+              >
+                <LogOut className="size-4 text-muted-foreground" aria-hidden="true" />
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
 
         <main id="main-content">
           {children}
