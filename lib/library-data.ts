@@ -1,3 +1,5 @@
+import { toDisplayDate } from './date-utils'
+
 export const SHIFTS = [
   {
     id: 'morning',
@@ -5,6 +7,7 @@ export const SHIFTS = [
     time: '6:00 — 10:00',
     short: '6 AM – 10 AM',
     displayTime: '6 AM – 10 AM',
+    startHour: 6,
   },
   {
     id: 'midday',
@@ -12,6 +15,7 @@ export const SHIFTS = [
     time: '10:00 — 14:00',
     short: '10 AM – 2 PM',
     displayTime: '10 AM – 2 PM',
+    startHour: 10,
   },
   {
     id: 'afternoon',
@@ -19,6 +23,7 @@ export const SHIFTS = [
     time: '14:00 — 18:00',
     short: '2 PM – 6 PM',
     displayTime: '2 PM – 6 PM',
+    startHour: 14,
   },
   {
     id: 'evening',
@@ -26,6 +31,7 @@ export const SHIFTS = [
     time: '18:00 — 22:00',
     short: '6 PM – 10 PM',
     displayTime: '6 PM – 10 PM',
+    startHour: 18,
   },
 ] as const
 
@@ -101,7 +107,8 @@ export const SEAT_COORDS = SEATS.map((seat, index) => ({
 // Get a readable expiry label
 export function getExpiryLabel(date: string) {
   const today = new Date()
-  const expiryDate = new Date(date)
+  const [y, m, d] = date.split('-').map(Number)
+  const expiryDate = new Date(y, m - 1, d)
 
   const days = Math.ceil(
     (expiryDate.getTime() - today.getTime()) / 86400000
@@ -115,16 +122,14 @@ export function getExpiryLabel(date: string) {
     return `${days} days left`
   }
 
-  return expiryDate.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-  })
+  return toDisplayDate(date)
 }
 
 // Get expiry status/tone
 export function getExpiryTone(date: string) {
   const today = new Date()
-  const expiryDate = new Date(date)
+  const [y, m, d] = date.split('-').map(Number)
+  const expiryDate = new Date(y, m - 1, d)
 
   const days = Math.ceil(
     (expiryDate.getTime() - today.getTime()) / 86400000

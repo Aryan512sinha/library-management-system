@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { AlertCircle, Check, Plus, X } from 'lucide-react'
 import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import { SHIFTS, type Assignment } from '@/lib/library-data'
+import { admissionBeforeExpiry, calculateExpiryDate } from '@/lib/date-utils'
 import { db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
@@ -14,13 +15,16 @@ export default function AssignmentPanel({
   assignments,
   onClose,
   onSaved,
+  role,
 }: {
   seatNo: string
   shiftId: string
   assignments: Assignment[]
   onClose: () => void
   onSaved: () => Promise<void>
+  role?: 'admin' | 'student'
 }) {
+  const isAdmin = role === 'admin'
   const existing = assignments.find(
     (item) => item.seatNo === seatNo && item.shiftIds?.includes(shiftId),
   )
@@ -29,6 +33,7 @@ export default function AssignmentPanel({
   const [billNo, setBillNo] = useState(existing?.billNo ?? '')
   const [admissionDate, setAdmissionDate] = useState(existing?.admissionDate ?? '')
   const [expiryDate, setExpiryDate] = useState(existing?.expiryDate ?? '')
+  const [expiryManual, setExpiryManual] = useState(false)
   const [mobileNo, setMobileNo] = useState(existing?.mobileNo ?? '')
   const [amountDue, setAmountDue] = useState(existing?.amountDue?.toString() ?? '0')
   const [amountPaid, setAmountPaid] = useState(existing?.amountPaid?.toString() ?? '0')
@@ -72,6 +77,18 @@ export default function AssignmentPanel({
     }, 150)
   }
 
+  const handleAdmissionChange = (value: string) => {
+    setAdmissionDate(value)
+    if (isAdmin && !expiryManual && value) {
+      setExpiryDate(calculateExpiryDate(value))
+    }
+  }
+
+  const handleExpiryChange = (value: string) => {
+    setExpiryDate(value)
+    setExpiryManual(true)
+  }
+
   const handleSave = async () => {
     if (!studentName.trim() || !billNo.trim()) {
       setError('Student name and bill number are required.')
@@ -91,6 +108,11 @@ export default function AssignmentPanel({
 
     if (!db) {
       setError('Firestore is not configured.')
+      return
+    }
+
+    if (!admissionBeforeExpiry(admissionDate, expiryDate)) {
+      setError('Admission date must be before or equal to expiry date.')
       return
     }
 
@@ -199,7 +221,7 @@ export default function AssignmentPanel({
       <div
         ref={trapRef}
         className={cn(
-          'flex w-full max-w-lg flex-col overflow-y-auto border-l border-border bg-card p-6 shadow-2xl sm:p-8',
+          'flex w-full max-h-[100dvh] max-w-lg flex-col overflow-y-auto border-l border-border bg-card p-6 shadow-2xl sm:max-h-none sm:p-8',
           visible && !closing && 'slide-in',
           closing && 'slide-out',
         )}
@@ -223,7 +245,7 @@ export default function AssignmentPanel({
             onClick={handleClose}
             aria-label="Close panel"
             className={cn(
-              'grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground transition duration-150',
+              'grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground icon-button',
               'hover:bg-destructive/10 hover:text-destructive',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
             )}
@@ -270,6 +292,7 @@ export default function AssignmentPanel({
             onChange={(event) => setStudentName(event.target.value)}
             placeholder="Full name"
             className={inputClasses}
+            readOnly={!isAdmin}
           />
 
           <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-bill-no">
@@ -281,6 +304,7 @@ export default function AssignmentPanel({
             onChange={(event) => setBillNo(event.target.value)}
             placeholder="KL-0001"
             className={inputClasses}
+            readOnly={!isAdmin}
           />
 
           <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-mobile">
@@ -294,6 +318,7 @@ export default function AssignmentPanel({
             maxLength={10}
             placeholder="9876543210"
             className={cn(inputClasses, mobileHasError && 'border-destructive')}
+            readOnly={!isAdmin}
           />
           {mobileHasError && (
             <p className="mt-1 -mt-3 text-xs text-destructive" role="alert">
@@ -310,8 +335,9 @@ export default function AssignmentPanel({
                 id="panel-admission"
                 type="date"
                 value={admissionDate}
-                onChange={(event) => setAdmissionDate(event.target.value)}
+                onChange={(event) => handleAdmissionChange(event.target.value)}
                 className={inputClasses}
+                readOnly={!isAdmin}
               />
             </div>
             <div>
@@ -322,8 +348,9 @@ export default function AssignmentPanel({
                 id="panel-expiry"
                 type="date"
                 value={expiryDate}
-                onChange={(event) => setExpiryDate(event.target.value)}
+                onChange={(event) => handleExpiryChange(event.target.value)}
                 className={inputClasses}
+                readOnly={!isAdmin}
               />
             </div>
           </div>
@@ -340,6 +367,7 @@ export default function AssignmentPanel({
                     type="button"
                     key={shift.id}
                     onClick={() => {
+                      if (!isAdmin) return
                       setSelectedShifts((prev) =>
                         prev.includes(shift.id)
                           ? prev.filter((id) => id !== shift.id)
@@ -347,12 +375,14 @@ export default function AssignmentPanel({
                       )
                     }}
                     aria-pressed={active}
+                    disabled={!isAdmin}
                     className={cn(
                       'rounded-lg border px-3 py-2 text-left transition duration-150',
                       'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                       active
                         ? 'border-primary bg-primary/15 text-primary'
                         : 'border-input bg-background text-muted-foreground hover:bg-muted',
+                      !isAdmin && 'opacity-70 cursor-not-allowed',
                     )}
                   >
                     <span className="block text-sm font-medium">{shift.name}</span>
@@ -377,6 +407,7 @@ export default function AssignmentPanel({
               value={dueStatus}
               onChange={(event) => setDueStatus(event.target.value as 'paid' | 'partial' | 'due')}
               className={inputClasses}
+              disabled={!isAdmin}
             >
               <option value="paid">Paid</option>
               <option value="partial">Partial</option>
@@ -393,15 +424,20 @@ export default function AssignmentPanel({
                 <button
                   type="button"
                   key={mode}
-                  onClick={() => setPaymentMode(mode)}
+                  onClick={() => {
+                    if (!isAdmin) return
+                    setPaymentMode(mode)
+                  }}
                   role="radio"
                   aria-checked={paymentMode === mode}
+                  disabled={!isAdmin}
                   className={cn(
                     'flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition duration-150',
                     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                     paymentMode === mode
                       ? 'border-primary bg-primary/15 text-primary'
                       : 'border-input bg-background text-muted-foreground hover:bg-muted',
+                    !isAdmin && 'opacity-70 cursor-not-allowed',
                   )}
                 >
                   {mode === 'cash' ? 'Cash' : 'Online'}
@@ -422,6 +458,7 @@ export default function AssignmentPanel({
                 value={amountPaid}
                 onChange={handleAmountPaidChange}
                 className={inputClasses}
+                readOnly={!isAdmin}
               />
             </div>
           )}
@@ -438,6 +475,7 @@ export default function AssignmentPanel({
                 value={amountDue}
                 onChange={handleAmountDueChange}
                 className={inputClasses}
+                readOnly={!isAdmin}
               />
             </div>
           )}
@@ -455,6 +493,7 @@ export default function AssignmentPanel({
                   value={amountPaid}
                   onChange={handleAmountPaidChange}
                   className={inputClasses}
+                  readOnly={!isAdmin}
                 />
               </div>
               <div>
@@ -468,6 +507,7 @@ export default function AssignmentPanel({
                   value={amountDue}
                   onChange={handleAmountDueChange}
                   className={inputClasses}
+                  readOnly={!isAdmin}
                 />
               </div>
             </div>
@@ -480,26 +520,27 @@ export default function AssignmentPanel({
             </div>
           )}
 
-          <button
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className={cn(
-              'mt-3 h-12 rounded-xl bg-primary text-sm font-semibold text-primary-foreground',
-              'transition duration-150 hover:brightness-110 active:scale-[0.98]',
-              'disabled:cursor-not-allowed disabled:opacity-60',
-              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-            )}
-          >
-            {saving ? 'Saving...' : existing ? 'Update assignment' : 'Save assignment'}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className={cn(
+                'mt-3 h-12 rounded-xl bg-primary text-sm font-semibold text-primary-foreground pressable',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+              )}
+            >
+              {saving ? 'Saving...' : existing ? 'Update assignment' : 'Save assignment'}
+            </button>
+          )}
 
-          {existing && (
+          {isAdmin && existing && (
             <button
               onClick={() => void handleDelete()}
               disabled={saving}
               className={cn(
-                'h-11 rounded-xl border border-destructive/30 text-sm font-semibold text-destructive',
-                'transition duration-150 hover:bg-destructive/5',
+                'h-11 rounded-xl border border-destructive/30 text-sm font-semibold text-destructive pressable',
+                'hover:bg-destructive/5',
                 'disabled:opacity-60',
                 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
               )}

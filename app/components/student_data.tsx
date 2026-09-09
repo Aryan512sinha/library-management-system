@@ -20,6 +20,7 @@ import {
   getExpiryLabel,
   getExpiryTone,
   type Assignment,
+  type Shift,
 } from '@/lib/library-data'
 import { db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
@@ -202,7 +203,7 @@ function StudentCard({
 // Page
 // ---------------------------------------------------------------------------
 
-export default function StudentsPage() {
+export default function StudentsPage({ role }: { role: 'admin' | 'student' }) {
   const [assignments, setAssignments] = useState<Assignment[]>(() => getCachedAssignments() ?? [])
   const [loadingData, setLoadingData] = useState(() => getCachedAssignments() === null)
   const [loadError, setLoadError] = useState('')
@@ -250,14 +251,29 @@ export default function StudentsPage() {
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
-    if (!q) return assignments
+    let list = assignments
+    if (q) {
+      list = assignments.filter((item) =>
+        [item.studentName, item.seatNo, item.billNo, item.mobileNo]
+          .join(' ')
+          .toLowerCase()
+          .includes(q),
+      )
+    }
 
-    return assignments.filter((item) =>
-      [item.studentName, item.seatNo, item.billNo, item.mobileNo]
-        .join(' ')
-        .toLowerCase()
-        .includes(q),
-    )
+    return list
+      .slice()
+      .sort((a, b) => {
+        const seatA = parseInt(a.seatNo || '0', 10)
+        const seatB = parseInt(b.seatNo || '0', 10)
+        if (seatA !== seatB) return seatA - seatB
+
+        const shiftA = (a.shiftIds ?? []).map((id) => SHIFTS.find((s) => s.id === id)).filter(Boolean) as Shift[]
+        const shiftB = (b.shiftIds ?? []).map((id) => SHIFTS.find((s) => s.id === id)).filter(Boolean) as Shift[]
+        const minStartA = shiftA.length ? Math.min(...shiftA.map((s) => s.startHour)) : 0
+        const minStartB = shiftB.length ? Math.min(...shiftB.map((s) => s.startHour)) : 0
+        return minStartA - minStartB
+      })
   }, [assignments, searchTerm])
 
   const dues = useMemo(
@@ -323,42 +339,44 @@ export default function StudentsPage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <div className={cn('flex gap-2', showAddInput ? 'flex' : 'hidden')}>
-              <input
-                type="text"
-                value={addSeatInput}
-                onChange={(e) => { setAddSeatInput(e.target.value); setAddSeatError('') }}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleAddStudent(); if (e.key === 'Escape') { setShowAddInput(false); setAddSeatError('') } }}
-                placeholder={`Seat 1\u2013${SEATS.length}`}
-                aria-label="Enter seat number to assign"
-                autoFocus
-                className="h-12 w-32 rounded-xl border border-input bg-background px-3 text-sm outline-none transition duration-150 focus:border-primary focus:ring-4 focus:ring-primary/10"
-              />
-              <button
-                onClick={handleAddStudent}
-                className={cn(
-                  'h-12 shrink-0 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground',
-                  'transition duration-150 hover:brightness-110 active:scale-[0.98]',
-                  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                )}
-              >
-                Assign
-              </button>
-              <button
-                onClick={() => { setShowAddInput(false); setAddSeatInput(''); setAddSeatError('') }}
-                className={cn(
-                  'h-12 shrink-0 rounded-xl border border-border bg-card px-3 text-sm font-semibold text-muted-foreground',
-                  'transition duration-150 hover:bg-muted',
-                  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                )}
-              >
-                Cancel
-              </button>
-            </div>
+            {role === 'admin' && (
+              <div className={cn('flex gap-2', showAddInput ? 'flex' : 'hidden')}>
+                <input
+                  type="text"
+                  value={addSeatInput}
+                  onChange={(e) => { setAddSeatInput(e.target.value); setAddSeatError('') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddStudent(); if (e.key === 'Escape') { setShowAddInput(false); setAddSeatError('') } }}
+                  placeholder={`Seat 1\u2013${SEATS.length}`}
+                  aria-label="Enter seat number to assign"
+                  autoFocus
+                  className="h-12 w-32 rounded-xl border border-input bg-background px-3 text-sm outline-none transition duration-150 focus:border-primary focus:ring-4 focus:ring-primary/10"
+                />
+                <button
+                  onClick={handleAddStudent}
+                  className={cn(
+                    'h-12 shrink-0 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground',
+                    'transition duration-150 hover:brightness-110 active:scale-[0.98]',
+                    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  )}
+                >
+                  Assign
+                </button>
+                <button
+                  onClick={() => { setShowAddInput(false); setAddSeatInput(''); setAddSeatError('') }}
+                  className={cn(
+                    'h-12 shrink-0 rounded-xl border border-border bg-card px-3 text-sm font-semibold text-muted-foreground',
+                    'transition duration-150 hover:bg-muted',
+                    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  )}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
             {addSeatError && showAddInput && (
               <p className="text-xs text-destructive" role="alert">{addSeatError}</p>
             )}
-            {!showAddInput && (
+            {role === 'admin' && !showAddInput && (
               <button
                 onClick={handleAddStudent}
                 className={cn(
@@ -443,6 +461,7 @@ export default function StudentsPage() {
           assignments={assignments}
           onClose={() => setPanelOpen(false)}
           onSaved={handleSaved}
+          role={role}
         />
       )}
     </>

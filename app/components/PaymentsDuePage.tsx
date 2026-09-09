@@ -11,13 +11,14 @@ import {
   X,
 } from 'lucide-react'
 import { SHIFTS, type Assignment } from '@/lib/library-data'
+import { formatDate } from '@/lib/date-utils'
 import { db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { getAssignments, getCachedAssignments } from '@/lib/client-data'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { Stat } from './DashboardShared'
 
-export default function PaymentsDuePage() {
+export default function PaymentsDuePage({ role }: { role: 'admin' | 'student' }) {
   const [assignments, setAssignments] = useState<Assignment[]>(() => getCachedAssignments() ?? [])
   const [loadingData, setLoadingData] = useState(() => getCachedAssignments() === null)
   const [refreshing, setRefreshing] = useState(false)
@@ -108,6 +109,12 @@ export default function PaymentsDuePage() {
   return (
     <>
       <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-10">
+        {role !== 'admin' && (
+          <div className="mt-6 flex items-center gap-2 rounded-xl bg-danger-subtle px-4 py-3 text-sm text-destructive" role="alert">
+            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+            You do not have permission to view payment and dues information.
+          </div>
+        )}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <h1 className="mt-3 font-serif text-3xl font-bold tracking-tight sm:text-4xl">
@@ -138,11 +145,13 @@ export default function PaymentsDuePage() {
         {loadError && (
           <div className="mt-6 flex items-center gap-2 rounded-xl bg-danger-subtle px-4 py-3 text-sm text-destructive" role="alert">
             <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
-            {loadError}
+            <span className="flex-1">{loadError}</span>
           </div>
         )}
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-3" role="list" aria-label="Payment statistics">
+        {role === 'admin' && (
+          <>
+            <div className="mt-8 grid gap-4 sm:grid-cols-3" role="list" aria-label="Payment statistics">
           <div role="listitem">
             <Stat icon={Wallet} label="Total collected" value={'Rs ' + totalCollected.toLocaleString('en-IN')} detail={assignments.length + ' students'} />
           </div>
@@ -196,9 +205,11 @@ export default function PaymentsDuePage() {
             )}
           </div>
         </div>
-      </div>
+      </>
+    )}
+    </div>
 
-      {/* Detail modal */}
+    {/* Detail modal */}
       {selected && (
         <div
           className="fixed inset-0 z-30 flex items-center justify-center bg-foreground/20 p-4 backdrop-blur-[2px] fade-in"
@@ -276,7 +287,7 @@ export default function PaymentsDuePage() {
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Expiry</dt>
-                <dd className="font-semibold">{selected.expiryDate || '-'}</dd>
+                <dd className="font-semibold">{formatDate(selected.expiryDate) || '-'}</dd>
               </div>
             </dl>
 

@@ -48,14 +48,10 @@ function todayStr(): string {
   return `${y}-${m}-${d}`
 }
 
+import { formatDate } from '@/lib/date-utils'
+
 function formatDateDisplay(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  return date.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
+  return formatDate(dateStr)
 }
 
 function shiftDateDocId(date: string, shiftId: string, seatNo: string): string {
@@ -159,7 +155,7 @@ const SeatCell = memo(function SeatCell({
 // LiveAttendancePage
 // ---------------------------------------------------------------------------
 
-export default function LiveAttendancePage() {
+export default function LiveAttendancePage({ role }: { role: 'admin' | 'student' }) {
   const [activeShift, setActiveShift] = useState<ShiftId>(SHIFTS[0].id)
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [attendanceMap, setAttendanceMap] = useState<Record<string, boolean>>(() =>
@@ -254,7 +250,7 @@ export default function LiveAttendancePage() {
 
   const toggleAttendance = useCallback(
     async (seatNo: string) => {
-      if (!db || togglingSeat) return
+      if (!db || togglingSeat || role !== 'admin') return
 
       const currentlyPresent = attendanceMap[seatNo] ?? false
       const docId = shiftDateDocId(selectedDate, activeShift, seatNo)
@@ -508,7 +504,7 @@ export default function LiveAttendancePage() {
                   present={present}
                   studentName={assignment?.studentName}
                   isEmpty={!assignment}
-                  isToggling={togglingSeat === seat.seatNo}
+                  isToggling={role !== 'admin' || togglingSeat === seat.seatNo}
                   onToggle={toggleAttendance}
                 />
               )

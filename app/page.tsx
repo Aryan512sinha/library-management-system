@@ -1,10 +1,11 @@
 'use client'
 
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { signOut } from 'firebase/auth'
 import type { Assignment } from '@/lib/library-data'
 import { auth } from '@/lib/firebase'
 import { clearClientCache } from '@/lib/client-data'
+import { getAdminProfile, type AdminProfile } from '@/lib/admin-profile'
 import { Login } from './components/Login'
 import { AppShell } from './components/DashboardShared'
 
@@ -17,8 +18,6 @@ const SettingsPage = lazy(() => import('./components/SettingsPage'))
 
 type View = 'login' | 'admin' | 'student' | 'students' | 'payments' | 'attendance' | 'settings'
 
-// Lightweight fallback shown only while a lazily-imported chunk loads for the
-// first time. Kept inside the content area so the shell never flashes.
 function ContentFallback() {
   return (
     <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-label="Loading view">
@@ -30,6 +29,7 @@ function ContentFallback() {
 export default function Page() {
   const [view, setView] = useState<View>('login')
   const [studentAssignment, setStudentAssignment] = useState<Assignment | null>(null)
+  const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null)
 
   const handleLogout = async () => {
     try {
@@ -40,7 +40,24 @@ export default function Page() {
       clearClientCache()
       setView('login')
       setStudentAssignment(null)
+      setAdminProfile(null)
     }
+  }
+
+  useEffect(() => {
+    if (view !== 'admin') return
+    let cancelled = false
+    getAdminProfile().then((profile) => {
+      if (!cancelled && profile) setAdminProfile(profile)
+    })
+    return () => { cancelled = true }
+  }, [view])
+
+  const updateAdminProfile = (patch: Partial<AdminProfile>) => {
+    setAdminProfile((prev) => {
+      const next = { ...(prev ?? {}), ...patch } as AdminProfile
+      return next
+    })
   }
 
   if (view === 'login') {
@@ -60,7 +77,7 @@ export default function Page() {
 
   const isStudent = studentAssignment !== null
   const role = isStudent ? 'student' : 'admin'
-  const greetingName = isStudent ? (studentAssignment?.studentName || 'Student') : 'Admin'
+  const greetingName = isStudent ? (studentAssignment?.studentName || 'Student') : (adminProfile?.displayName || 'Admin')
   const activeView =
     view === 'admin' || view === 'student'
       ? 'overview'
@@ -83,14 +100,15 @@ export default function Page() {
       onNavigatePayments={goPayments}
       onNavigateSettings={goSettings}
       onLogout={() => void handleLogout()}
+      adminProfile={adminProfile ?? undefined}
     >
       <div key={view} className="page-enter">
         <Suspense fallback={<ContentFallback />}>
           {view === 'admin' && <AdminDashboard />}
-          {view === 'students' && <StudentsPage />}
-          {view === 'payments' && <PaymentsDuePage />}
-          {view === 'attendance' && <LiveAttendancePage />}
-          {view === 'settings' && <SettingsPage role={role} student={studentAssignment ?? undefined} onLogout={() => void handleLogout()} />}
+          {view === 'students' && role === 'admin' && <StudentsPage role={role} />}
+          {view === 'payments' && role === 'admin' && <PaymentsDuePage role={role} />}
+          {view === 'attendance' && role === 'admin' && <LiveAttendancePage role={role} />}
+          {view === 'settings' && <SettingsPage role={role} student={studentAssignment ?? undefined} onLogout={() => void handleLogout()} adminProfile={adminProfile ?? undefined} onProfileUpdate={updateAdminProfile} />}
           {view === 'student' && studentAssignment && (
             <StudentDashboard
               student={studentAssignment}

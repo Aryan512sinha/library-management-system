@@ -22,6 +22,7 @@ import {
   type Assignment,
   type Shift,
 } from '@/lib/library-data'
+import { formatDate } from '@/lib/date-utils'
 import { db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { getAssignments, getCachedAssignments } from '@/lib/client-data'
@@ -511,6 +512,7 @@ export function AdminDashboard() {
           assignments={assignments}
           onClose={() => setPanelOpen(false)}
           onSaved={handleSaved}
+          role="admin"
         />
       )}
 

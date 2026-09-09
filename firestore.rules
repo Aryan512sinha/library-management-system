@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function isStudent() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // assignments: student/subscription records
+    match /assignments/{assignmentId} {
+      allow read: if isAdmin() || isStudent() || request.auth == null;
+      allow write: if isAdmin();
+    }
+
+    // attendance records
+    match /attendance/{attendanceId} {
+      allow read: if isAdmin() || isStudent() || request.auth == null;
+      allow write: if isAdmin();
+    }
+
+    // admin profile documents
+    match /adminProfiles/{profileId} {
+      allow read, write: if isAdmin();
+    }
+
+    // default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
