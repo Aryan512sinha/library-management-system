@@ -106,22 +106,6 @@ export const SEAT_COORDS = SEATS.map((seat, index) => ({
 
 // Get a readable expiry label
 export function getExpiryLabel(date: string) {
-  const today = new Date()
-  const [y, m, d] = date.split('-').map(Number)
-  const expiryDate = new Date(y, m - 1, d)
-
-  const days = Math.ceil(
-    (expiryDate.getTime() - today.getTime()) / 86400000
-  )
-
-  if (days < 0) {
-    return 'Expired'
-  }
-
-  if (days <= 14) {
-    return `${days} days left`
-  }
-
   return toDisplayDate(date)
 }
 

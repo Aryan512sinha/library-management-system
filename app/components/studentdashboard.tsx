@@ -102,7 +102,7 @@ export function StudentDashboard({
             <Stat icon={LayoutDashboard} label="Your seat" value={record.seatNo || '\u2014'} detail={record.shiftIds?.join(', ') || '\u2014'} />
           </div>
           <div role="listitem">
-            <Stat icon={Clock3} label="Valid until" value={formatDate(record.expiryDate) || '\u2014'} detail={getExpiryLabel(record.expiryDate)} />
+            <Stat icon={Clock3} label="Valid until" value={formatDate(record.expiryDate) || '\u2014'} />
           </div>
           <div role="listitem">
             <Stat
