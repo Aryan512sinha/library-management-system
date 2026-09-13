@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, Check, Plus, X } from 'lucide-react'
 import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore'
-import { SHIFTS, type Assignment } from '@/lib/library-data'
+import { SHIFTS, SEATS, type Assignment } from '@/lib/library-data'
 import { admissionBeforeExpiry, calculateExpiryDate } from '@/lib/date-utils'
 import { db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
@@ -29,6 +29,7 @@ export default function AssignmentPanel({
     (item) => item.seatNo === seatNo && item.shiftIds?.includes(shiftId),
   )
 
+  const [seatNoValue, setSeatNoValue] = useState(seatNo)
   const [studentName, setStudentName] = useState(existing?.studentName ?? '')
   const [billNo, setBillNo] = useState(existing?.billNo ?? '')
   const [admissionDate, setAdmissionDate] = useState(existing?.admissionDate ?? '')
@@ -89,9 +90,20 @@ export default function AssignmentPanel({
     setExpiryManual(true)
   }
 
+  const handleSeatNoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSeatNoValue(event.target.value.replace(/\D/g, ''))
+  }
+
   const handleSave = async () => {
     if (!studentName.trim() || !billNo.trim()) {
       setError('Student name and bill number are required.')
+      return
+    }
+
+    const trimmedSeat = seatNoValue.trim()
+    const seatNum = parseInt(trimmedSeat, 10)
+    if (!trimmedSeat || isNaN(seatNum) || seatNum < 1 || seatNum > SEATS.length) {
+      setError(`Please enter a valid seat number (1-${SEATS.length}).`)
       return
     }
 
@@ -116,6 +128,21 @@ export default function AssignmentPanel({
       return
     }
 
+    // Prevent double-booking: block if another assignment already occupies
+    // the target seat during an overlapping shift.
+    const conflict = assignments.find(
+      (item) =>
+        item.id !== existing?.id &&
+        item.seatNo === trimmedSeat &&
+        item.shiftIds?.some((id) => selectedShifts.includes(id)),
+    )
+    if (conflict) {
+      setError(
+        `Seat ${trimmedSeat} is already assigned to ${conflict.studentName} in an overlapping shift.`,
+      )
+      return
+    }
+
     setSaving(true)
     setError('')
 
@@ -129,7 +156,7 @@ export default function AssignmentPanel({
     }
 
     const assignmentData = {
-      seatNo,
+      seatNo: trimmedSeat,
       studentName: studentName.trim(),
       billNo: billNo.trim(),
       shiftIds: selectedShifts,
@@ -202,6 +229,12 @@ export default function AssignmentPanel({
 
   const mobileDigits = mobileNo.replace(/\D/g, '')
   const mobileHasError = mobileDigits.length !== 0 && mobileDigits.length !== 10
+
+  const seatDigits = seatNoValue.trim()
+  const seatNumParsed = parseInt(seatDigits, 10)
+  const seatHasError =
+    seatDigits.length !== 0 &&
+    (isNaN(seatNumParsed) || seatNumParsed < 1 || seatNumParsed > SEATS.length)
 
   const inputClasses = cn(
     'mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm',
@@ -283,6 +316,33 @@ export default function AssignmentPanel({
         </div>
 
         <div className="mt-8 flex flex-col gap-5">
+          {isAdmin && (
+            <>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-seat-no">
+                Seat number
+              </label>
+              <input
+                id="panel-seat-no"
+                value={seatNoValue}
+                onChange={handleSeatNoChange}
+                inputMode="numeric"
+                maxLength={3}
+                placeholder={`1-${SEATS.length}`}
+                className={cn(inputClasses, seatHasError && 'border-destructive')}
+              />
+              {seatHasError && (
+                <p className="mt-1 -mt-3 text-xs text-destructive" role="alert">
+                  Please enter a valid seat number (1-{SEATS.length})
+                </p>
+              )}
+              {existing && seatDigits && seatDigits !== seatNo && !seatHasError && (
+                <p className="mt-1 -mt-3 text-xs text-muted-foreground">
+                  This will move the student from seat {seatNo} to seat {seatDigits}.
+                </p>
+              )}
+            </>
+          )}
+
           <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="panel-student-name">
             Student name
           </label>
