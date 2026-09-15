@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'KL Book House | Library Management',
-  description: 'A clear view of every seat, shift, renewal, and library membership at KL Book House.',
+  title: 'KL Boox House | Library Management',
+  description: 'A clear view of every seat, shift, renewal, and library membership at KL Boox House.',
   icons: {
     icon: [
       {

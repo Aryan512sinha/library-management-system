@@ -11,10 +11,12 @@ import { cn } from '@/lib/utils'
 
 export function Login({
   onLogin,
+  initialRole = 'admin',
 }: {
   onLogin: (role: Role, studentAssignment?: Assignment) => void
+  initialRole?: Role
 }) {
-  const [role, setRole] = useState<Role>('admin')
+  const [role, setRole] = useState<Role>(initialRole)
 
   const [email, setEmail] = useState('admin@klbookhouse.in')
   const [password, setPassword] = useState('')
@@ -156,7 +158,7 @@ export function Login({
 
           <p className="mt-7 max-w-md text-base leading-7 text-muted-foreground">
             Know every seat, every shift, and every renewal at a glance. Built
-            for the people who keep KL Book House moving.
+            for the people who keep KL Boox House moving.
           </p>
 
           <div className="mt-10 flex flex-wrap gap-6 text-sm text-muted-foreground">
