@@ -2,7 +2,6 @@
 
 import { useEffect, useCallback, useState, useRef } from 'react'
 import {
-  BookOpen,
   ChevronDown,
   ClipboardCheck,
   Clock3,
@@ -37,12 +36,16 @@ export { mapAssignmentDoc }
 export function Logo() {
   return (
     <div className="flex items-center gap-3">
-      <div className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-        <BookOpen className="size-5" aria-hidden="true" />
+      <div className="grid size-10 shrink-0 place-items-center">
+        <img
+          src="/images/library/kl-boox-house-logo.png"
+          alt="KL Boox House logo"
+          className="size-10 object-contain"
+        />
       </div>
       <div>
         <p className="font-serif text-lg font-bold leading-none tracking-tight">
-          KL Book House
+          KL Boox House
         </p>
         <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Library management
@@ -559,7 +562,7 @@ export function AppShell({
               Good morning, {greetingName}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              KL Book House
+              KL Boox House
             </p>
           </div>
 

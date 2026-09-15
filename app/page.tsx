@@ -2,11 +2,12 @@
 
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { signOut } from 'firebase/auth'
-import type { Assignment } from '@/lib/library-data'
+import type { Assignment, Role } from '@/lib/library-data'
 import { auth } from '@/lib/firebase'
 import { clearClientCache } from '@/lib/client-data'
 import { getAdminProfile, type AdminProfile } from '@/lib/admin-profile'
 import { Login } from './components/Login'
+import { LandingPage } from './components/LandingPage'
 import { AppShell } from './components/DashboardShared'
 
 const AdminDashboard = lazy(() => import('./components/admindashboard').then(m => ({ default: m.AdminDashboard })))
@@ -16,7 +17,7 @@ const PaymentsDuePage = lazy(() => import('./components/PaymentsDuePage'))
 const LiveAttendancePage = lazy(() => import('./components/LiveAttendancePage'))
 const SettingsPage = lazy(() => import('./components/SettingsPage'))
 
-type View = 'login' | 'admin' | 'student' | 'students' | 'payments' | 'attendance' | 'settings'
+type View = 'landing' | 'login' | 'admin' | 'student' | 'students' | 'payments' | 'attendance' | 'settings'
 
 function ContentFallback() {
   return (
@@ -27,7 +28,8 @@ function ContentFallback() {
 }
 
 export default function Page() {
-  const [view, setView] = useState<View>('login')
+  const [view, setView] = useState<View>('landing')
+  const [loginRole, setLoginRole] = useState<Role>('admin')
   const [studentAssignment, setStudentAssignment] = useState<Assignment | null>(null)
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null)
 
@@ -38,7 +40,7 @@ export default function Page() {
       console.error('Logout failed:', error)
     } finally {
       clearClientCache()
-      setView('login')
+      setView('landing')
       setStudentAssignment(null)
       setAdminProfile(null)
     }
@@ -60,9 +62,21 @@ export default function Page() {
     })
   }
 
+  if (view === 'landing') {
+    return (
+      <LandingPage
+        onSelectRole={(role) => {
+          setLoginRole(role)
+          setView('login')
+        }}
+      />
+    )
+  }
+
   if (view === 'login') {
     return (
       <Login
+        initialRole={loginRole}
         onLogin={(role, assignment) => {
           if (role === 'admin') {
             setView('admin')
