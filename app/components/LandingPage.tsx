@@ -18,7 +18,7 @@ import {
   UsersRound,
 } from 'lucide-react'
 import type { Role } from '@/lib/library-data'
-import { Logo } from './DashboardShared'
+import { CommonHeader, Logo } from './DashboardShared'
 import { cn } from '@/lib/utils'
 
 /**
@@ -62,12 +62,13 @@ export function LandingPage({
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_80%_10%,hsl(var(--accent)/.7),transparent_38%),linear-gradient(135deg,hsl(var(--background)),hsl(var(--muted)))]">
       {/* ---------- Header ---------- */}
-      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 px-6 py-5 backdrop-blur lg:px-12">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <a href="#home">
+      <CommonHeader
+        left={
+          <a href="#home" className="inline-block">
             <Logo />
           </a>
-
+        }
+        right={
           <nav className="flex items-center gap-2 sm:gap-3">
             <a
               href="#home"
@@ -100,8 +101,8 @@ export function LandingPage({
               Student login
             </button>
           </nav>
-        </div>
-      </header>
+        }
+      />
 
       {/* ---------- Hero ---------- */}
       <section id="home" className="mx-auto max-w-6xl px-6 pb-20 pt-14 lg:px-12 sm:pt-20">

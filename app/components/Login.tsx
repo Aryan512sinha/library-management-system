@@ -6,7 +6,7 @@ import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import type { Assignment, Role } from '@/lib/library-data'
 import { auth, db } from '@/lib/firebase'
-import { Logo, mapAssignmentDoc } from './DashboardShared'
+import { CommonHeader, Logo, mapAssignmentDoc } from './DashboardShared'
 import { cn } from '@/lib/utils'
 
 export function Login({
@@ -134,17 +134,18 @@ export function Login({
   )
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_80%_10%,hsl(var(--accent)/.7),transparent_38%),linear-gradient(135deg,hsl(var(--background)),hsl(var(--muted)))] px-6 py-8 lg:px-12">
-      <header className="flex items-center justify-between">
-        <Logo />
+    <main className="min-h-screen bg-[radial-gradient(circle_at_80%_10%,hsl(var(--accent)/.7),transparent_38%),linear-gradient(135deg,hsl(var(--background)),hsl(var(--muted)))]">
+      <CommonHeader
+        left={<Logo />}
+        right={
+          <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
+            <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+            Secure workspace
+          </div>
+        }
+      />
 
-        <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
-          <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
-          Secure workspace
-        </div>
-      </header>
-
-      <div className="mx-auto grid min-h-[calc(100vh-120px)] max-w-6xl items-center gap-10 py-10 lg:grid-cols-[1.08fr_.92fr] lg:gap-16">
+      <div className="mx-auto grid min-h-[calc(100vh-120px)] max-w-6xl items-center gap-10 px-6 py-10 lg:grid-cols-[1.08fr_.92fr] lg:gap-16 lg:px-12">
         <section className="max-w-xl">
           <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-card/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[.16em] text-primary">
             <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />

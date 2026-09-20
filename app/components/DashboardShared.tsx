@@ -55,6 +55,34 @@ export function Logo() {
   )
 }
 
+export function CommonHeader({
+  left,
+  center,
+  right,
+  className,
+}: {
+  left?: React.ReactNode
+  center?: React.ReactNode
+  right?: React.ReactNode
+  className?: string
+}) {
+  return (
+    <header
+      className={cn(
+        'border-b border-border/70 bg-[var(--background)]/90 px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-10',
+        className,
+      )}
+      role="banner"
+    >
+      <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">{left ?? <Logo />}</div>
+        {center && <div className="hidden min-w-0 flex-1 justify-center text-center lg:flex">{center}</div>}
+        <div className="flex shrink-0 items-center justify-end gap-3">{right}</div>
+      </div>
+    </header>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Stat card
 // ---------------------------------------------------------------------------
@@ -543,42 +571,47 @@ export function AppShell({
       />
 
       <div className="lg:pl-64">
-        <header className="header-bar flex h-16 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-sm sm:h-20 sm:px-6 lg:px-10" role="banner">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open menu"
-              className="grid size-10 place-items-center rounded-xl border border-border text-muted-foreground icon-button lg:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              <Menu className="size-5" />
-            </button>
-            <div className="lg:hidden">
-              <Logo />
+        <CommonHeader
+          className="header-bar h-16 sm:h-20"
+          left={
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setDrawerOpen(true)}
+                aria-label="Open menu"
+                className="grid size-10 place-items-center rounded-xl border border-border text-muted-foreground icon-button lg:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <Menu className="size-5" />
+              </button>
+              <div className="lg:hidden">
+                <Logo />
+              </div>
             </div>
-          </div>
-
-          <div className="hidden lg:block">
-            <p className="font-serif text-xl font-bold">
-              Good morning, {greetingName}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              KL Boox House
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ProfileMenu
-              role={role}
-              greetingName={greetingName}
-              adminProfile={adminProfile}
-              onProfile={onNavigateSettings}
-              onSettings={onNavigateSettings}
-              onLogout={onLogout}
-              open={adminMenuOpen}
-              onOpenChange={setAdminMenuOpen}
-            />
-          </div>
-        </header>
+          }
+          center={
+            <div className="hidden lg:block">
+              <p className="font-serif text-xl font-bold">
+                Good morning, {greetingName}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                KL Boox House
+              </p>
+            </div>
+          }
+          right={
+            <div className="flex items-center gap-2 sm:gap-3">
+              <ProfileMenu
+                role={role}
+                greetingName={greetingName}
+                adminProfile={adminProfile}
+                onProfile={onNavigateSettings}
+                onSettings={onNavigateSettings}
+                onLogout={onLogout}
+                open={adminMenuOpen}
+                onOpenChange={setAdminMenuOpen}
+              />
+            </div>
+          }
+        />
 
         {/* Mobile admin inline menu — pushes main content down */}
         <div
