@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { AlertCircle, ArrowRight, Clock3, ShieldCheck, Users } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ArrowRight, Clock3, ShieldCheck, Users } from 'lucide-react'
 import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import type { Assignment, Role } from '@/lib/library-data'
@@ -11,9 +11,11 @@ import { cn } from '@/lib/utils'
 
 export function Login({
   onLogin,
+  onBackToLanding,
   initialRole = 'admin',
 }: {
   onLogin: (role: Role, studentAssignment?: Assignment) => void
+  onBackToLanding: () => void
   initialRole?: Role
 }) {
   const [role, setRole] = useState<Role>(initialRole)
@@ -138,9 +140,20 @@ export function Login({
       <CommonHeader
         left={<Logo />}
         right={
-          <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
-            <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
-            Secure workspace
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onBackToLanding}
+              aria-label="Back to home"
+              className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Back to home</span>
+            </button>
+            <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
+              <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+              Secure workspace
+            </div>
           </div>
         }
       />

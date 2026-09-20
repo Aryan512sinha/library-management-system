@@ -1,6 +1,6 @@
 'use client'
 
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { signOut } from 'firebase/auth'
 import type { Assignment, Role } from '@/lib/library-data'
 import { auth } from '@/lib/firebase'
@@ -32,6 +32,36 @@ export default function Page() {
   const [loginRole, setLoginRole] = useState<Role>('admin')
   const [studentAssignment, setStudentAssignment] = useState<Assignment | null>(null)
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null)
+  const [authenticated, setAuthenticated] = useState(false)
+
+  const navigateTo = useCallback((nextView: View, replace = false) => {
+    const state = { view: nextView }
+    if (replace) {
+      window.history.replaceState(state, '', window.location.href)
+    } else {
+      window.history.pushState(state, '', window.location.href)
+    }
+    setView(nextView)
+  }, [])
+
+  useEffect(() => {
+    window.history.replaceState({ view: 'landing' }, '', window.location.href)
+  }, [])
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const nextView = event.state?.view as View | undefined
+      if (!nextView || (nextView !== 'landing' && nextView !== 'login' && !authenticated)) {
+        window.history.replaceState({ view: 'landing' }, '', window.location.href)
+        setView('landing')
+        return
+      }
+      setView(nextView)
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [authenticated])
 
   const handleLogout = async () => {
     try {
@@ -40,7 +70,8 @@ export default function Page() {
       console.error('Logout failed:', error)
     } finally {
       clearClientCache()
-      setView('landing')
+      setAuthenticated(false)
+      navigateTo('landing', true)
       setStudentAssignment(null)
       setAdminProfile(null)
     }
@@ -67,7 +98,7 @@ export default function Page() {
       <LandingPage
         onSelectRole={(role) => {
           setLoginRole(role)
-          setView('login')
+          navigateTo('login')
         }}
       />
     )
@@ -77,12 +108,15 @@ export default function Page() {
     return (
       <Login
         initialRole={loginRole}
+        onBackToLanding={() => navigateTo('landing')}
         onLogin={(role, assignment) => {
           if (role === 'admin') {
-            setView('admin')
+            setAuthenticated(true)
+            navigateTo('admin')
           } else if (assignment) {
+            setAuthenticated(true)
             setStudentAssignment(assignment)
-            setView('student')
+            navigateTo('student')
           }
         }}
       />
@@ -97,11 +131,11 @@ export default function Page() {
       ? 'overview'
       : (view as 'overview' | 'attendance' | 'students' | 'payments' | 'settings')
 
-  const goOverview = () => setView(isStudent ? 'student' : 'admin')
-  const goAttendance = () => setView('attendance')
-  const goStudents = () => setView('students')
-  const goPayments = () => setView('payments')
-  const goSettings = () => setView('settings')
+  const goOverview = () => navigateTo(isStudent ? 'student' : 'admin')
+  const goAttendance = () => navigateTo('attendance')
+  const goStudents = () => navigateTo('students')
+  const goPayments = () => navigateTo('payments')
+  const goSettings = () => navigateTo('settings')
 
   return (
     <AppShell
