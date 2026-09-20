@@ -44,7 +44,7 @@ export const SEATS = Array.from({ length: 57 }, (_, index) => ({
 // Library contact information
 export const ADMIN_CONTACT = {
   name: 'Library Desk',
-  phone: '+91 00000 00000',
+  phone: '+91 79790 31015',
   email: 'klbookhouse@example.com',
   hours: '06:00 — 22:00 daily',
 }
