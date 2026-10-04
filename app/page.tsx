@@ -9,6 +9,7 @@ import { getAdminProfile, type AdminProfile } from '@/lib/admin-profile'
 import { Login } from './components/Login'
 import { LandingPage } from './components/LandingPage'
 import { AppShell } from './components/DashboardShared'
+import { AIQuizPage } from './components/ai-quiz/AIQuizPage'
 
 const AdminDashboard = lazy(() => import('./components/admindashboard').then(m => ({ default: m.AdminDashboard })))
 const StudentDashboard = lazy(() => import('./components/studentdashboard').then(m => ({ default: m.StudentDashboard })))
@@ -17,7 +18,7 @@ const PaymentsDuePage = lazy(() => import('./components/PaymentsDuePage'))
 const LiveAttendancePage = lazy(() => import('./components/LiveAttendancePage'))
 const SettingsPage = lazy(() => import('./components/SettingsPage'))
 
-type View = 'landing' | 'login' | 'admin' | 'student' | 'students' | 'payments' | 'attendance' | 'settings'
+type View = 'landing' | 'login' | 'admin' | 'student' | 'students' | 'payments' | 'attendance' | 'settings' | 'aiQuiz'
 
 function ContentFallback() {
   return (
@@ -70,6 +71,8 @@ export default function Page() {
       console.error('Logout failed:', error)
     } finally {
       clearClientCache()
+      window.sessionStorage.removeItem('library-role')
+      window.sessionStorage.removeItem('library-student')
       setAuthenticated(false)
       navigateTo('landing', true)
       setStudentAssignment(null)
@@ -111,9 +114,12 @@ export default function Page() {
         onBackToLanding={() => navigateTo('landing')}
         onLogin={(role, assignment) => {
           if (role === 'admin') {
+            window.sessionStorage.setItem('library-role', 'admin')
             setAuthenticated(true)
             navigateTo('admin')
           } else if (assignment) {
+            window.sessionStorage.setItem('library-role', 'student')
+            window.sessionStorage.setItem('library-student', JSON.stringify(assignment))
             setAuthenticated(true)
             setStudentAssignment(assignment)
             navigateTo('student')
@@ -129,13 +135,17 @@ export default function Page() {
   const activeView =
     view === 'admin' || view === 'student'
       ? 'overview'
-      : (view as 'overview' | 'attendance' | 'students' | 'payments' | 'settings')
+      : (view as 'overview' | 'attendance' | 'students' | 'payments' | 'settings' | 'aiQuiz')
 
   const goOverview = () => navigateTo(isStudent ? 'student' : 'admin')
   const goAttendance = () => navigateTo('attendance')
   const goStudents = () => navigateTo('students')
   const goPayments = () => navigateTo('payments')
   const goSettings = () => navigateTo('settings')
+  const goQuiz = () => {
+    window.history.pushState({ view: 'aiQuiz' }, '', '/student/ai-quiz')
+    setView('aiQuiz')
+  }
 
   return (
     <AppShell
@@ -147,6 +157,7 @@ export default function Page() {
       onNavigateStudents={goStudents}
       onNavigatePayments={goPayments}
       onNavigateSettings={goSettings}
+      onNavigateQuiz={isStudent ? goQuiz : undefined}
       onLogout={() => void handleLogout()}
       adminProfile={adminProfile ?? undefined}
     >
@@ -161,7 +172,11 @@ export default function Page() {
             <StudentDashboard
               student={studentAssignment}
               onIdentityChange={setStudentAssignment}
+              onQuiz={goQuiz}
             />
+          )}
+          {view === 'aiQuiz' && role === 'student' && (
+            <AIQuizPage onBackToDashboard={goOverview} />
           )}
         </Suspense>
       </div>
