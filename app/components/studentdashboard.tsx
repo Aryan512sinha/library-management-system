@@ -194,9 +194,11 @@ function AttendanceGrid({ record }: { record: Assignment }) {
 export function StudentDashboard({
   student,
   onIdentityChange,
+  onQuiz,
 }: {
   student: Assignment
   onIdentityChange?: (record: Assignment) => void
+  onQuiz?: () => void
 }) {
   const [record, setRecord] = useState<Assignment>(student)
   const [loadingData, setLoadingData] = useState(false)
@@ -378,6 +380,20 @@ export function StudentDashboard({
         </div>
 
         <AttendanceGrid record={record} />
+
+        <button
+          type="button"
+          onClick={() => onQuiz?.()}
+          className="mt-6 flex w-full flex-col items-start gap-3 rounded-3xl border border-primary/20 bg-gradient-to-r from-primary/[0.1] to-card p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50"
+        >
+          <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
+            <Sparkles className="size-4" aria-hidden="true" />
+            AI Quiz
+          </span>
+          <span className="font-serif text-2xl font-bold">Turn study material into practice</span>
+          <span className="text-sm text-muted-foreground">Create a smart 20-question quiz from your notes, PDFs, or images.</span>
+          <span className="rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground">Create Quiz</span>
+        </button>
 
         <div className="mt-6 flex flex-col justify-between gap-5 rounded-3xl border border-primary/10 bg-gradient-to-r from-primary/[0.08] to-card p-6 shadow-sm sm:flex-row sm:items-center">
           <div>

@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  Sparkles,
   User,
   Users,
   X,
@@ -402,18 +403,20 @@ export function AppShell({
   onNavigateStudents,
   onNavigatePayments,
   onNavigateSettings,
+  onNavigateQuiz,
   onLogout,
   adminProfile,
   children,
 }: {
   role: Role
   greetingName: string
-  activeView?: 'overview' | 'attendance' | 'students' | 'payments' | 'settings'
+  activeView?: 'overview' | 'attendance' | 'students' | 'payments' | 'settings' | 'aiQuiz'
   onNavigateOverview?: () => void
   onNavigateAttendance?: () => void
   onNavigateStudents?: () => void
   onNavigatePayments?: () => void
   onNavigateSettings?: () => void
+  onNavigateQuiz?: () => void
   onLogout: () => void
   adminProfile?: AdminProfile
   children: React.ReactNode
@@ -518,6 +521,18 @@ export function AppShell({
             Payments & dues
           </button>
         </>
+      )}
+
+      {role === 'student' && (
+        <button
+          type="button"
+          onClick={() => { onNavigateQuiz?.(); closeDrawer() }}
+          className={navLinkClasses(activeView === 'aiQuiz')}
+          aria-current={activeView === 'aiQuiz' ? 'page' : undefined}
+        >
+          <Sparkles className="size-4" aria-hidden="true" />
+          AI Quiz
+        </button>
       )}
 
       <button
